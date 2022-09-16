@@ -1,0 +1,10 @@
+build
+node_modules
+types
+.DS_Store
+.env
+.deps
+coverage.json
+coverage
+multi_spaces
+**/artifacts
