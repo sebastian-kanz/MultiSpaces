@@ -25,6 +25,8 @@ jobs:
           ssh://git@github.com/
 
       - name: Install dependencies
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: npm ci
 
       - name: Test coverage
