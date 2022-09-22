@@ -90,6 +90,12 @@ module.exports = {
 
   // Set default mocha options here, use special reporters etc.
   mocha: {
+    reporter: 'eth-gas-reporter',
+    reporterOptions: {
+      excludeContracts: ['Migrations'],
+      currency: "USD",
+      gasPrice: 0.3,
+    }
     // timeout: 100000
   },
 
@@ -129,6 +135,6 @@ module.exports = {
   // }
   // }
 
-  plugins: ["truffle-contract-size", "solidity-coverage"]
+  plugins: ["truffle-contract-size"]//, "solidity-coverage"]
 };
 
