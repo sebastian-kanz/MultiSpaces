@@ -8,6 +8,9 @@ on:
     branches: [ "master" ]
 
   workflow_dispatch:
+  
+env:
+  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
 jobs:
   build:
@@ -25,8 +28,6 @@ jobs:
           ssh://git@github.com/
 
       - name: Install dependencies
-        env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
         run: npm ci
 
       - name: Test coverage
