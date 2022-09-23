@@ -13,7 +13,7 @@
     "migrate": "tsc -p ./tsconfig.migrate.json --outDir migrations && truffle migrate",
     "test": "truffle test",
     "ganache-cli": "ganache-cli -p 7545 --gasLimit=0x1fffffffffffff --allowUnlimitedContractSize -e 1000000000 > /dev/null &",
-    "coverage": "truffle run coverage",
+    "coverage": "truffle run coverage --solcoverjs ./.solcover.js --network coverage",
     "typecheck": "tsc --noEmit",
     "deploy": "truffle deploy --network ropsten",
     "size": "truffle run contract-size",
@@ -26,6 +26,7 @@
     "@openzeppelin/contracts": "^4.5.0",
     "@truffle/hdwallet-provider": "^2.0.4",
     "dotenv": "^16.0.0",
+    "ganache-cli": "^6.12.2",
     "truffle-contract-size": "^2.0.1"
   },
   "devDependencies": {
@@ -38,7 +39,7 @@
     "@types/node": "^18.7.18",
     "@types/web3": "^1.2.2",
     "eth-gas-reporter": "^0.2.25",
-    "solidity-coverage": "^0.8.2",
+    "solidity-coverage": "^0.7.22",
     "truffle": "^5.5.30",
     "truffle-hdwallet-provider": "^1.0.17",
     "truffle-typings": "^1.0.8",

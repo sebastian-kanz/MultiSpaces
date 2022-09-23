@@ -53,6 +53,13 @@ module.exports = {
       network_id: "*",       // Any network (default: none)
       gas: 20000000
     },
+    coverage: {
+      host: '127.0.0.1',
+      port: 8555,
+      network_id: "*",
+      gas: 20000000,
+      timeoutBlocks: 200
+    },
     alfajores: {
       provider: new HDWalletProvider({
         privateKeys: [process.env.PRIVATE_KEY],
@@ -135,6 +142,6 @@ module.exports = {
   // }
   // }
 
-  plugins: ["truffle-contract-size"]//, "solidity-coverage"]
+  plugins: ["truffle-contract-size", "solidity-coverage"]
 };
 
