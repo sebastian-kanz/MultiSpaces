@@ -61,3 +61,13 @@ jobs:
         with:
           name: coverage
           path: coverage
+          
+      - name: Create Awesome Badge
+        uses: schneegans/dynamic-badges-action@v1.4.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 6b1becf89882397d41d0651c68c1d30f
+          filename: test.json
+          label: Hello
+          message: World
+          color: orange
