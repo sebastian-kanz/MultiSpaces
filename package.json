@@ -16,6 +16,7 @@
     "coverage": "truffle run coverage --solcoverjs ./.solcover.js --network coverage",
     "typecheck": "tsc --noEmit",
     "deploy": "truffle deploy --network ropsten",
+    "lint": "solhint 'contracts/**/*.sol'",
     "size": "truffle run contract-size",
     "format": "prettier --config .prettierrc --write \"test/**/*.+(ts)\""
   },
@@ -27,6 +28,7 @@
     "@truffle/hdwallet-provider": "^2.0.4",
     "dotenv": "^16.0.0",
     "ganache-cli": "^6.12.2",
+    "solhint": "^3.3.7",
     "truffle-contract-size": "^2.0.1"
   },
   "devDependencies": {
