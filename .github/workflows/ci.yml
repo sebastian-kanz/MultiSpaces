@@ -13,7 +13,7 @@ env:
   PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
 
 jobs:
-  report:
+  test:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,18 +41,97 @@ jobs:
             ${{ runner.os }}-
 
       - name: Install dependencies
-        #if: steps.cache-nodemodules.outputs.cache-hit != 'true'
-        run: npm ci --include=dev #--prefer-offline
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: npm ci --include=dev
 
       - name: Build if no dependencies installed
         if: steps.cache-nodemodules.outputs.cache-hit == 'true'
         run: npm run postinstall
 
-      - name: Linting
+      - name: Lint
         run: npm run lint
 
-      - name: Test size
-        run: npm run size
+      - name: Test
+        run: npm run lint
+
+      - name: Print gas report
+        run: cat gas-report.txt
+
+  size:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - name: Reconfigure git to use HTTP authentication
+        run: >
+          git config --global url."https://github.com/".insteadOf
+          ssh://git@github.com/
+
+      - name: Cache node modules
+        id: cache-nodemodules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: npm ci --include=dev
+
+      - name: Build if no dependencies installed
+        if: steps.cache-nodemodules.outputs.cache-hit == 'true'
+        run: npm run postinstall
+
+      - name: Report size
+        run: npm run size >> size.txt
+
+      - name: Print size report
+        run: cat size.txt
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 16
+
+      - name: Reconfigure git to use HTTP authentication
+        run: >
+          git config --global url."https://github.com/".insteadOf
+          ssh://git@github.com/
+
+      - name: Cache node modules
+        id: cache-nodemodules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+        run: npm ci --include=dev
+
+      - name: Build if no dependencies installed
+        if: steps.cache-nodemodules.outputs.cache-hit == 'true'
+        run: npm run postinstall
         
       - name: Test coverage
         run: npm run coverage

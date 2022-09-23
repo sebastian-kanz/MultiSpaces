@@ -103,6 +103,7 @@ module.exports = {
       excludeContracts: ['Migrations'],
       currency: "USD",
       gasPrice: 0.3,
+      outputFile: './gas-report.txt'
     }
     // timeout: 100000
   },
