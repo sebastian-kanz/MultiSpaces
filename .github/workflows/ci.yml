@@ -52,7 +52,7 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm run test
+        run: npm run test --network goerli
 
       - name: Print gas report
         run: cat gas-report.txt
