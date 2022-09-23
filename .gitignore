@@ -8,3 +8,5 @@ coverage.json
 coverage
 multi_spaces
 **/artifacts
+.coverage_artifacts/
+.coverage_contracts/
