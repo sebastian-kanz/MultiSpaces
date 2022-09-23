@@ -52,7 +52,7 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm run lint
+        run: npm run test
 
       - name: Print gas report
         run: cat gas-report.txt
