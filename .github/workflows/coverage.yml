@@ -46,6 +46,7 @@ jobs:
 
       - name: Build if no dependencies installed
         if: steps.cache-nodemodules.outputs.cache-hit == 'true'
+        run: npm run postinstall
 
       - name: Test size
         run: npm run size
