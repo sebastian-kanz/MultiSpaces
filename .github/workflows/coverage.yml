@@ -33,5 +33,5 @@ jobs:
       - name: Test size
         run: npm run size
         
-      #- name: Test coverage
-      #  run: npm run coverage
+      - name: Test coverage
+        run: npm run coverage

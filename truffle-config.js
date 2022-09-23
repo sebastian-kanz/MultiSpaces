@@ -58,7 +58,8 @@ module.exports = {
       port: 8555,
       network_id: "*",
       gas: 20000000,
-      timeoutBlocks: 200
+      timeoutBlocks: 200,
+      networkCheckTimeout: 10000,
     },
     alfajores: {
       provider: new HDWalletProvider({
