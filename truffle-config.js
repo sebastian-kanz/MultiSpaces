@@ -41,8 +41,6 @@ module.exports = {
       network_id: 5,
       timeoutBlocks: 200,
       networkCheckTimeout: 10000,
-      // gas: 4465030
-      // gasPrice: 10000000000,
     },
   },
 
