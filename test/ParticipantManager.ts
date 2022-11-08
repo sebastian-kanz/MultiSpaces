@@ -19,7 +19,7 @@ contract('ParticipantManager', (accounts) => {
   const adminRoleHash =
     '0x0000000000000000000000000000000000000000000000000000000000000000';
   const participantRoleHash = Web3.utils.keccak256('PARTICIPANT');
-  const editorRoleHash = Web3.utils.keccak256('EDITOR');
+  const editorRoleHash = Web3.utils.keccak256('UPDATEOR');
   const managerRoleHash = Web3.utils.keccak256('MANAGER');
   const ownerRoleHash = Web3.utils.keccak256('OWNER');
 
@@ -48,8 +48,8 @@ contract('ParticipantManager', (accounts) => {
       assert.equal(participantRoleHash, roleHash);
     });
 
-    it('EDITOR_ROLE', async () => {
-      const roleHash = await instance.EDITOR_ROLE();
+    it('UPDATEOR_ROLE', async () => {
+      const roleHash = await instance.UPDATEOR_ROLE();
       assert.equal(editorRoleHash, roleHash);
     });
 
@@ -99,7 +99,7 @@ contract('ParticipantManager', (accounts) => {
       assert.equal(hasRole, true);
     });
 
-    it('deployer has EDITOR_ROLE', async () => {
+    it('deployer has UPDATEOR_ROLE', async () => {
       const hasRole = await instance.hasRole(editorRoleHash, adr);
       assert.equal(hasRole, true);
     });

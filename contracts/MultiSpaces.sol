@@ -4,8 +4,12 @@ import './Space.sol';
 import './PaymentManager.sol';
 import './factories/BucketFactory.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
+import '@openzeppelin/contracts/proxy/Clones.sol';
 
 contract MultiSpaces is Ownable {
+  using Clones for address;
+  // TODO: Use minimal proxy here instead of real instance. Makes deployment while cloning much cheaper
+  address spaceImplementation;
   address[] public spaces;
   mapping(bytes => address) public ownedSpaces;
   uint256 public baseFee = 1000000000000000;
@@ -13,10 +17,11 @@ contract MultiSpaces is Ownable {
   PaymentManager public paymentManager;
   BucketFactory public bucketFactory;
 
-  constructor() {
+  constructor(BucketFactory bfactory, address impl) {
     paymentManager = new PaymentManager(baseFee, baseLimit);
     paymentManager.transferOwnership(owner());
-    bucketFactory = new BucketFactory();
+    bucketFactory = bfactory;
+    spaceImplementation = impl;
   }
 
   function createSpace(string memory participantName, bytes memory pubKey)
@@ -25,7 +30,9 @@ contract MultiSpaces is Ownable {
     returns (address)
   {
     if (ownedSpaces[pubKey] == address(0)) {
-      Space space = (new Space){ value: msg.value }(
+      Space space = Space(spaceImplementation.clone());
+      space.initialize{ value: msg.value }(
+        msg.sender,
         participantName,
         pubKey,
         address(bucketFactory),
@@ -33,6 +40,8 @@ contract MultiSpaces is Ownable {
       );
       spaces.push(address(space));
       ownedSpaces[pubKey] = address(space);
+
+      bucketFactory.registerSpace(address(space));
       return address(space);
     }
     return ownedSpaces[pubKey];
@@ -47,8 +56,6 @@ contract MultiSpaces is Ownable {
   }
 
   function _sendToPaymentManager() private {
-    address payable adr = payable(paymentManager);
-    (bool sent, ) = adr.call{ value: msg.value }('');
-    require(sent, 'Failed to send to payment manager!');
+    paymentManager.increaseCredits{ value: msg.value }(msg.sender);
   }
 }

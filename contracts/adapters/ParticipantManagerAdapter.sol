@@ -7,27 +7,53 @@ import '../interfaces/IParticipantManager.sol';
 abstract contract ParticipantManagerAdapter {
   IParticipantManager public participantManager;
 
-  constructor(address partManager) {
+  function _setParticipantManager(address partManager) internal {
     participantManager = IParticipantManager(partManager);
   }
 
-  modifier onlyRole(bytes32 role) {
-    if (!participantManager.hasRole(role, tx.origin)) {
+  function _onlyRole(bytes32 role) internal view {
+    if (!participantManager.hasRole(role, msg.sender)) {
       revert(
         string(
           abi.encodePacked(
             'AccessControl: account ',
-            Strings.toHexString(uint160(tx.origin), 20),
+            Strings.toHexString(uint160(msg.sender), 20),
             ' is missing role ',
             Strings.toHexString(uint256(role), 32)
           )
         )
       );
     }
+  }
+
+  modifier onlyRole(bytes32 role) {
+    _onlyRole(role);
     _;
   }
 
   function participantCount() internal view returns (uint256) {
     return participantManager.participantCount();
+  }
+
+  function _redeemParticipationCode(
+    string memory name,
+    address inviter,
+    address invitee,
+    bytes memory signature,
+    string memory randomCode,
+    bytes memory pubKey
+  ) internal {
+    participantManager.redeemParticipationCode(
+      name,
+      inviter,
+      invitee,
+      signature,
+      randomCode,
+      pubKey
+    );
+  }
+
+  function _removeParticipation(address participant) internal {
+    participantManager.removeParticipation(participant);
   }
 }

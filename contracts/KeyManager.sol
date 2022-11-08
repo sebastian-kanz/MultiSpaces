@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
+//TODO: Instead of using key hashes, use encyrypted keys! So keys will be securely stored onchain!
+// As long as one participant in the same epoch can read its key, all other can be re-constructed
 abstract contract KeyManager {
   mapping(uint256 => mapping(address => string)) epochToParticipantToKeyMapping;
   uint256 public GENESIS;

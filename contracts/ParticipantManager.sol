@@ -3,21 +3,21 @@ pragma solidity ^0.8.12;
 import '@openzeppelin/contracts/access/AccessControl.sol';
 import './interfaces/IParticipantManager.sol';
 import './interfaces/IPaymentManager.sol';
-import './ParticipantInteractor.sol';
+import './libraries/LibParticipant.sol';
 import './libraries/InvitationChecker.sol';
 import './libraries/PubKeyChecker.sol';
 import './adapters/PaymentAdapter.sol';
 
 contract ParticipantManager is
   IParticipantManager,
-  ParticipantInteractor,
   AccessControl,
   PaymentAdapter
 {
+  using LibParticipant for *;
   using PubKeyChecker for address;
   using InvitationChecker for bytes;
 
-  mapping(address => Participant) public allParticipants;
+  mapping(address => LibParticipant.Participant) public allParticipants;
 
   address[] public allParticipantAddresses;
 
@@ -27,12 +27,21 @@ contract ParticipantManager is
 
   event RemoveParticipant(address indexed _participant);
 
+  bytes32[4] public ALL_ROLES = [
+    LibParticipant.PARTICIPANT_ROLE,
+    LibParticipant.UPDATEOR_ROLE,
+    LibParticipant.MANAGER_ROLE,
+    LibParticipant.OWNER_ROLE
+  ];
+
   constructor(
     string memory name,
     address participant,
     bytes memory pubKey,
     address pManager
-  ) PaymentAdapter(pManager) {
+  ) {
+    // TODO: Add more roles to msg.sender (space) to ensure space can interact with bucket
+    _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     require(
       keccak256(abi.encodePacked(name)) != keccak256(abi.encodePacked('')),
       'Missing name'
@@ -41,10 +50,10 @@ contract ParticipantManager is
 
     bytes32[] memory roles = new bytes32[](5);
     roles[0] = DEFAULT_ADMIN_ROLE;
-    roles[1] = OWNER_ROLE;
-    roles[2] = MANAGER_ROLE;
-    roles[3] = EDITOR_ROLE;
-    roles[4] = PARTICIPANT_ROLE;
+    roles[1] = LibParticipant.OWNER_ROLE;
+    roles[2] = LibParticipant.MANAGER_ROLE;
+    roles[3] = LibParticipant.UPDATEOR_ROLE;
+    roles[4] = LibParticipant.PARTICIPANT_ROLE;
     _addParticipant(participant, name, pubKey);
 
     // Further roles submitted in [roles]
@@ -53,6 +62,7 @@ contract ParticipantManager is
     }
 
     paymentManager = IPaymentManager(pManager);
+    _setPaymentManager(pManager);
   }
 
   function participantCount() external view returns (uint256) {
@@ -74,17 +84,20 @@ contract ParticipantManager is
     bytes memory pubKey
   ) internal {
     adr.validatePubKey(pubKey);
-    allParticipants[adr] = Participant(adr, name, pubKey, true);
+    allParticipants[adr] = LibParticipant.Participant(adr, name, pubKey, true);
     allParticipantAddresses.push(adr);
   }
 
   /// @notice Users can remove their participation
-  function removeParticipation() external onlyRole(PARTICIPANT_ROLE) {
-    delete (allParticipants[msg.sender]);
+  function removeParticipation(address participant)
+    external
+    onlyRole(DEFAULT_ADMIN_ROLE)
+  {
+    delete (allParticipants[participant]);
 
     int256 foundIndex = -1;
     for (uint256 i = 0; i < allParticipantAddresses.length; i++) {
-      if (allParticipantAddresses[i] == msg.sender) {
+      if (allParticipantAddresses[i] == participant) {
         foundIndex = int256(i);
       }
     }
@@ -94,10 +107,10 @@ contract ParticipantManager is
     ];
     allParticipantAddresses.pop();
     // Remove all roles for participant
-    for (uint256 i = 0; i < ParticipantInteractor.ALL_ROLES.length; i++) {
-      renounceRole(ParticipantInteractor.ALL_ROLES[i], msg.sender);
+    for (uint256 i = 0; i < ALL_ROLES.length; i++) {
+      renounceRole(ALL_ROLES[i], participant);
     }
-    emit RemoveParticipant(msg.sender);
+    emit RemoveParticipant(participant);
   }
 
   /// @notice Users can redeem their participation code from existing member to join the BucktManager
@@ -108,11 +121,12 @@ contract ParticipantManager is
   function redeemParticipationCode(
     string memory name,
     address inviter,
+    address invitee,
     bytes memory signature,
     string memory randomCode,
     bytes memory pubKey
-  ) external payable charge(IPaymentManager.PayableAction.ADD_PARTICIPANT) {
-    require(hasRole(MANAGER_ROLE, inviter), 'Forbidden');
+  ) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    require(hasRole(LibParticipant.MANAGER_ROLE, inviter), 'Forbidden');
 
     (bool isValid, bytes32 hash) = signature.isValidInvitation(
       inviter,
@@ -120,13 +134,13 @@ contract ParticipantManager is
     );
     require(isValid, 'Invalid invitation');
 
-    require(allParticipants[msg.sender].initialized == false, 'User exists');
+    require(allParticipants[invitee].initialized == false, 'User exists');
     require(allInvitationHashes[hash] == false, 'Already used');
     allInvitationHashes[hash] = true;
 
-    _addParticipant(msg.sender, name, pubKey);
-    _grantRole(PARTICIPANT_ROLE, msg.sender);
+    _addParticipant(invitee, name, pubKey);
+    _grantRole(LibParticipant.PARTICIPANT_ROLE, invitee);
 
-    emit AddParticipant(msg.sender);
+    emit AddParticipant(invitee);
   }
 }

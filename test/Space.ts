@@ -18,19 +18,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       const spaceOwner = await instance.spaceOwner();
       expect(spaceOwner[0]).equals(accounts[0]);
       expect(spaceOwner[1]).equals('Peter');
@@ -43,7 +45,7 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
@@ -51,6 +53,7 @@ contract('Space', (accounts) => {
 
       await expectRevert(
         Space.new(
+          accounts[0],
           'Peter',
           '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
           bucketFactory.address,
@@ -67,19 +70,22 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+
+      await bucketFactory.registerSpace(instance.address);
 
       await instance.addBucket('Bucket1', { value: new BN(1000000000000000) });
       const bucket = await instance.getAllBuckets();
@@ -92,19 +98,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       const receipt = await instance.addBucket('Bucket1', {
         value: new BN(1000000000000000),
       });
@@ -120,19 +128,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.addBucket('Bucket1', { value: new BN(123) }),
@@ -144,19 +154,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.addBucket('Bucket1', {
@@ -171,19 +183,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       await instance.addBucket('Bucket1', { value: new BN(1000000000000000) });
 
       await expectRevert(
@@ -194,28 +208,34 @@ contract('Space', (accounts) => {
   });
 
   describe('Removing a Bucket', () => {
-    it('works as expected', async () => {
+    it.only('works as expected', async () => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await instance.addBucket('Bucket1', {
         value: new BN(1000000000000000),
         from: accounts[0],
       });
+      // TODO: This does not work because of the rights-system
+      // Access control must be handled directly on bucket level
+      // and also on space level. Ensure that space has sufficient rights
+      // to alter bucket state. => add space to bucket owner
       await instance.removeBucket('Bucket1', { from: accounts[0] });
 
       const buckets = await instance.getAllBuckets();
@@ -226,19 +246,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       await instance.addBucket('Bucket1', { value: new BN(1000000000000000) });
       const receipt = await instance.removeBucket('Bucket1');
 
@@ -249,43 +271,47 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
-      await instance.addBucket('Bucket1', { value: new BN(1000000000000000) }),
-        await expectRevert(
-          instance.removeBucket('Bucket1', { from: accounts[1] }),
-          'Forbidden'
-        );
+      await bucketFactory.registerSpace(instance.address);
+      await instance.addBucket('Bucket1', { value: new BN(1000000000000000) });
+      await expectRevert(
+        instance.removeBucket('Bucket1', { from: accounts[1] }),
+        'Forbidden'
+      );
     });
 
     it('fails if bucket does not exist', async () => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(instance.removeBucket('Bucket1'), 'revert');
     });
@@ -296,19 +322,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await instance.addBucket('Bucket1', {
         value: new BN(1000000000000000),
@@ -332,19 +360,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       await instance.addBucket('Bucket1', { value: new BN(1000000000000000) });
       const receipt = await instance.renameBucket('Bucket1', 'Bucket_01');
 
@@ -359,19 +389,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
       await instance.addBucket('Bucket1', { value: new BN(1000000000000000) }),
         await expectRevert(
           instance.renameBucket('Bucket1', 'Bucket_01', { from: accounts[1] }),
@@ -383,19 +415,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.renameBucket('Bucket1', 'Bucket_01'),
@@ -409,19 +443,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.addElementsToBucket('Bucket1', [], [], [], [], 0),
@@ -435,19 +471,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.updateElementsInBucket(
@@ -471,19 +509,21 @@ contract('Space', (accounts) => {
       const creditChecker = await CreditChecker.new();
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
-      Space.link('CreditChecker', creditChecker.address);
+      PaymentManager.link('CreditChecker', creditChecker.address);
       Space.link('PubKeyChecker', pubKeyChecker.address);
       Space.link('InvitationChecker', invitationChecker.address);
       const bucketFactory = await BucketFactory.new();
       const paymentManager = await PaymentManager.new(1000000000000000, 100);
 
       const instance = await Space.new(
+        accounts[0],
         'Peter',
         '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436',
         bucketFactory.address,
         paymentManager.address,
         { value: new BN(1000000000000000) }
       );
+      await bucketFactory.registerSpace(instance.address);
 
       await expectRevert(
         instance.removeElementsFromBucket('Bucket1', [], [], []),

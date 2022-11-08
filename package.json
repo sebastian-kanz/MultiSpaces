@@ -11,7 +11,8 @@
     "generate-types-client": "typechain --target=web3-v1 './build/contracts/*.json'",
     "postinstall": "rm -rf ./build && rm -rf ./types && truffle compile && yarn generate-types && yarn generate-types-client",
     "migrate": "tsc -p ./tsconfig.migrate.json --outDir migrations && truffle migrate",
-    "test": "truffle test --network goerli",
+    "test": "ganache && truffle test",
+    "test:goerli": "truffle test --network goerli",
     "ganache-cli": "ganache-cli -p 7545 --gasLimit=0x1fffffffffffff --allowUnlimitedContractSize -e 1000000000 > /dev/null &",
     "coverage": "truffle run coverage --solcoverjs ./.solcover.js --network coverage",
     "typecheck": "tsc --noEmit",
@@ -27,7 +28,7 @@
     "@openzeppelin/contracts": "^4.5.0",
     "@truffle/hdwallet-provider": "^2.0.4",
     "dotenv": "^16.0.0",
-    "ganache-cli": "^6.12.2",
+    "ganache": "^7.4.4",
     "solhint": "^3.3.7",
     "truffle-contract-size": "^2.0.1"
   },

@@ -4,14 +4,16 @@ import './libraries/PubKeyChecker.sol';
 import './interfaces/IBucket.sol';
 import './interfaces/IBucketFactory.sol';
 import './interfaces/IPaymentManager.sol';
-import './ParticipantInteractor.sol';
+import './libraries/LibParticipant.sol';
 import './ParticipantManager.sol';
 import './adapters/PaymentAdapter.sol';
+import '@openzeppelin/contracts/proxy/utils/Initializable.sol';
 
-contract Space is PaymentAdapter, ParticipantInteractor {
+contract Space is PaymentAdapter, Initializable {
+  using LibParticipant for *;
   using PubKeyChecker for address;
 
-  Participant public spaceOwner;
+  LibParticipant.Participant public spaceOwner;
   IBucketFactory public bucketFactory;
 
   string[] public allBucketNames;
@@ -27,19 +29,22 @@ contract Space is PaymentAdapter, ParticipantInteractor {
     _;
   }
 
-  constructor(
+  function initialize(
+    address owner,
     string memory name,
     bytes memory pubKey,
     address bFactory,
     address pManager
   )
+    public
     payable
-    PaymentAdapter(pManager)
     charge(IPaymentManager.PayableAction.CREATE_SPACE)
+    initializer
   {
+    _setPaymentManager(pManager);
     bucketFactory = IBucketFactory(bFactory);
-    tx.origin.validatePubKey(pubKey);
-    spaceOwner = Participant(tx.origin, name, pubKey, true);
+    owner.validatePubKey(pubKey);
+    spaceOwner = LibParticipant.Participant(owner, name, pubKey, true);
   }
 
   function _bucketActive(string memory name) private view {
@@ -69,19 +74,19 @@ contract Space is PaymentAdapter, ParticipantInteractor {
     external
     payable
     onlySpaceOwner
+    charge(IPaymentManager.PayableAction.ADD_BUCKET)
     returns (address)
   {
     require(!allBuckets[name].active, 'Bucket already exists!');
-    IBucket bucket = bucketFactory.createBucket{ value: msg.value }(
+    ParticipantManager partManager = new ParticipantManager(
+      spaceOwner.name,
+      spaceOwner.adr,
+      spaceOwner.publicKey,
+      address(paymentManager)
+    );
+    IBucket bucket = bucketFactory.createBucket(
       address(paymentManager),
-      address(
-        new ParticipantManager(
-          spaceOwner.name,
-          spaceOwner.adr,
-          spaceOwner.publicKey,
-          address(paymentManager)
-        )
-      )
+      address(partManager)
     );
     allBuckets[name] = BucketContainer(bucket, true);
     allBucketNames.push(name);
@@ -113,68 +118,6 @@ contract Space is PaymentAdapter, ParticipantInteractor {
     _removeBucketNameFromList(name);
     delete (allBuckets[name]);
     emit Rename(name, newBucketName, msg.sender);
-  }
-
-  function addElementsToBucket(
-    string memory name,
-    string[] memory newMetaHashes,
-    string[] memory newDataHashes,
-    string[] memory newContainerHashes,
-    string[] memory parentContainerHashes,
-    IBucket.ContentType contentType
-  ) external payable bucketActive(name) {
-    allBuckets[name].bucket.createElements(
-      newMetaHashes,
-      newDataHashes,
-      newContainerHashes,
-      parentContainerHashes,
-      contentType
-    );
-  }
-
-  function updateElementsInBucket(
-    string memory name,
-    string[] memory prevMetaHashes,
-    string[] memory newMetaHashes,
-    string[] memory prevDataHashes,
-    string[] memory newDataHashes,
-    string[] memory prevContainerHashes,
-    string[] memory newContainerHashes,
-    string[] memory parentContainerHashes,
-    IBucket.ContentType contentType
-  ) external payable bucketActive(name) {
-    allBuckets[name].bucket.updateElements(
-      prevMetaHashes,
-      newMetaHashes,
-      prevDataHashes,
-      newDataHashes,
-      prevContainerHashes,
-      newContainerHashes,
-      parentContainerHashes,
-      contentType
-    );
-  }
-
-  function removeElementsFromBucket(
-    string memory name,
-    string[] memory metaHashes,
-    string[] memory dataHashes,
-    string[] memory containerHashes
-  ) external bucketActive(name) {
-    allBuckets[name].bucket.removeElements(
-      metaHashes,
-      dataHashes,
-      containerHashes
-    );
-  }
-
-  function getAllElementsFromBucket(string memory name)
-    external
-    view
-    bucketActive(name)
-    returns (IBucket.Element[] memory)
-  {
-    return allBuckets[name].bucket.getAll();
   }
 
   function getAllBuckets() external view returns (BucketContainer[] memory) {

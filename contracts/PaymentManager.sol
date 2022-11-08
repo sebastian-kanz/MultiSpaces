@@ -41,9 +41,9 @@ contract PaymentManager is IPaymentManager, Ownable {
     override
   {
     initLimts();
-    require(limits[tx.origin][action] > amount, 'Limit depleted');
-    limits[tx.origin][action] -= amount;
-    emit LimitedActionEvent(action, tx.origin, limits[tx.origin][action]);
+    require(limits[msg.sender][action] >= amount, 'Limit depleted');
+    limits[msg.sender][action] -= amount;
+    emit LimitedActionEvent(action, msg.sender, limits[msg.sender][action]);
   }
 
   // Only owner can increase someone's limit
@@ -58,30 +58,30 @@ contract PaymentManager is IPaymentManager, Ownable {
   }
 
   function initLimts() private {
-    if (!limitsInitialized[tx.origin]) {
-      limits[tx.origin][LimitedAction.ADD_DATA] = DEFAULT_LIMITS[
+    if (!limitsInitialized[msg.sender]) {
+      limits[msg.sender][LimitedAction.ADD_DATA] = DEFAULT_LIMITS[
         LimitedAction.ADD_DATA
       ];
-      limitsInitialized[tx.origin] = true;
+      limitsInitialized[msg.sender] = true;
     }
   }
 
   /// Vouchers are bound to a specific payable action and credited by the manufacturer
   /// Credits are bought by the participant and can be used for every payable action
   function chargeFee(PayableAction action) external payable override {
-    if (!freeOfChargePayableActions[tx.origin][action]) {
-      if (vouchers[tx.origin][action] > 0) {
-        vouchers[tx.origin][action] -= 1;
-        emit PayableActionEvent(action, tx.origin, 1, true, false);
+    if (!freeOfChargePayableActions[msg.sender][action]) {
+      if (vouchers[msg.sender][action] > 0) {
+        vouchers[msg.sender][action] -= 1;
+        emit PayableActionEvent(action, msg.sender, 1, true, false);
       } else {
-        if (credits[tx.origin] >= DEFAULT_PAYMENTS[action]) {
-          credits[tx.origin] -= DEFAULT_PAYMENTS[action];
+        if (credits[msg.sender] >= DEFAULT_PAYMENTS[action]) {
+          credits[msg.sender] -= DEFAULT_PAYMENTS[action];
         } else {
           require(
             msg.value >= DEFAULT_PAYMENTS[action],
             string.concat(
               'Insufficient fee for account ',
-              Strings.toHexString(uint160(tx.origin), 20),
+              Strings.toHexString(uint160(msg.sender), 20),
               ' (',
               Strings.toString(msg.value),
               '/',
@@ -90,11 +90,11 @@ contract PaymentManager is IPaymentManager, Ownable {
             )
           );
         }
-        emit PayableActionEvent(action, tx.origin, msg.value, false, false);
+        emit PayableActionEvent(action, msg.sender, msg.value, false, false);
       }
     } else {
-      credits[tx.origin] += msg.value;
-      emit PayableActionEvent(action, tx.origin, msg.value, false, true);
+      credits[msg.sender] += msg.value;
+      emit PayableActionEvent(action, msg.sender, msg.value, false, true);
     }
   }
 
@@ -193,11 +193,15 @@ contract PaymentManager is IPaymentManager, Ownable {
     _updateDefaultLimits(newBaseLimit);
   }
 
+  function increaseCredits(address receiver) external payable {
+    credits[receiver] = credits[receiver] + msg.value;
+  }
+
   receive() external payable {
-    credits[tx.origin] = credits[tx.origin] + msg.value;
+    credits[msg.sender] = credits[msg.sender] + msg.value;
   }
 
   fallback() external payable {
-    credits[tx.origin] = credits[tx.origin] + msg.value;
+    credits[msg.sender] = credits[msg.sender] + msg.value;
   }
 }

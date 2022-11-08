@@ -1,0 +1,525 @@
+➜ truffle migrate --reset
+
+Compiling your contracts...
+===========================
+> Everything is up to date, there is nothing to compile.
+
+
+Starting migrations...
+======================
+> Network name:    'development'
+> Network id:      5777
+> Block gas limit: 6721975 (0x6691b7)
+
+
+1_initial_migration.js
+======================
+
+   Deploying 'Migrations'
+   ----------------------
+   > transaction hash:    0x176f2a365129c621aabad9c464d46882d7c38c8d6c509192ebe11b36fa43dc8a
+   > Blocks: 0            Seconds: 0
+   > contract address:    0x9d3a73DFd197C2a1fbf50d649c104a4c646d7f4B
+   > block number:        43
+   > block timestamp:     1667934910
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.36844044
+   > gas used:            248842 (0x3cc0a)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.00497684 ETH
+
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:          0.00497684 ETH
+
+
+2_deploy_contracts.js
+=====================
+
+   Deploying 'CreditChecker'
+   -------------------------
+   > transaction hash:    0xa56376b9bd8ace66e363b6f7f505f617829e1abce3c6664175ab3ea98c054652
+   > Blocks: 0            Seconds: 0
+   > contract address:    0x3d6AA1498024DEa9596C5d731839538ab5379327
+   > block number:        45
+   > block timestamp:     1667934911
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.35445956
+   > gas used:            656531 (0xa0493)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.01313062 ETH
+
+
+   Deploying 'PubKeyChecker'
+   -------------------------
+   > transaction hash:    0xcd1fedff43b05ff4b287c631fd0340a5c204cb914eb7d96c848fb776c5a1595d
+   > Blocks: 0            Seconds: 0
+   > contract address:    0x69DeEE7fA76475B2Be6ebab62aA6a9A2080e2726
+   > block number:        46
+   > block timestamp:     1667934911
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.34261048
+   > gas used:            592454 (0x90a46)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.01184908 ETH
+
+
+   Deploying 'InvitationChecker'
+   -----------------------------
+   > transaction hash:    0xd0f9a2345d0fd299767af4e606f663d3f79ce41d1441468f02c0b3b11644b3c7
+   > Blocks: 0            Seconds: 0
+   > contract address:    0x1bF87f2AD5B1418A1350163b52189e0935040111
+   > block number:        47
+   > block timestamp:     1667934911
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.3300283
+   > gas used:            629109 (0x99975)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.01258218 ETH
+
+
+   Deploying 'Bucket'
+   ------------------
+   > transaction hash:    0x0f63c1dd002d9df3f1d98856308e8271768dffcc20c04857aa60e78a074bf211
+   > Blocks: 0            Seconds: 0
+   > contract address:    0x9dff229808b618efCD66496ceE0d2ccF9aFb3061
+   > block number:        48
+   > block timestamp:     1667934911
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.25187336
+   > gas used:            3907747 (0x3ba0a3)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.07815494 ETH
+
+
+   Deploying 'Element'
+   -------------------
+   > transaction hash:    0xbd8093ecd3aeb2ed4da3d7ccf2b0e4eb72c7a4082921f7c7c543cda28ec215d6
+   > Blocks: 0            Seconds: 0
+   > contract address:    0xF5CbE20bfF7de30E0F4942b7a38d40A84698254b
+   > block number:        49
+   > block timestamp:     1667934912
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.20609474
+   > gas used:            2288931 (0x22ed23)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.04577862 ETH
+
+
+   Deploying 'BucketFactory'
+   -------------------------
+   > transaction hash:    0x9756bb50aebe323fb929a3eb2e11facd9686c98a03b6a91ca1a2ebb03eed17f3
+   > Blocks: 0            Seconds: 0
+   > contract address:    0xb4c0482E25005B52BcD068ECEa738e1B7d5202af
+   > block number:        50
+   > block timestamp:     1667934912
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.19153
+   > gas used:            728237 (0xb1cad)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.01456474 ETH
+
+
+   Linking
+   -------
+   * Contract: Space <--> Library: PubKeyChecker (at address: 0x69DeEE7fA76475B2Be6ebab62aA6a9A2080e2726)
+
+   Linking
+   -------
+   * Contract: Space <--> Library: InvitationChecker (at address: 0x1bF87f2AD5B1418A1350163b52189e0935040111)
+
+   Deploying 'Space'
+   -----------------
+   > transaction hash:    0xac4ef2be3d530671fe8f9631f06c9a5f32a736695aac7ca10699fb6f7ebc6a7d
+   > Blocks: 0            Seconds: 0
+   > contract address:    0xe9179ae5E8e5ba4AD1c1c5637c98cdaf81d29cA0
+   > block number:        51
+   > block timestamp:     1667934912
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.0850157
+   > gas used:            5325715 (0x514393)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.1065143 ETH
+
+
+   Linking
+   -------
+   * Contract: MultiSpaces <--> Library: CreditChecker (at address: 0x3d6AA1498024DEa9596C5d731839538ab5379327)
+
+   Deploying 'MultiSpaces'
+   -----------------------
+   > transaction hash:    0xbe9b960fb02aece614c918330f207705af4f2a12a3c52b9363458d090b064f94
+   > Blocks: 0            Seconds: 0
+   > contract address:    0xFcCa255B59646F57A3B805E8D458B33CC329A131
+   > block number:        52
+   > block timestamp:     1667934913
+   > account:             0x29673b8f9909036eC84c0e03E451757b16d3aFDe
+   > balance:             99999.0060989
+   > gas used:            3945840 (0x3c3570)
+   > gas price:           20 gwei
+   > value sent:          0 ETH
+   > total cost:          0.0789168 ETH
+
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:          0.36149128 ETH
+
+Summary
+=======
+> Total deployments:   9
+> Final cost:          0.36646812 ETH
+
+
+MultiSpaces on  master [✘!?] via ⬢ v14.18.0 
+➜ truffle migrate --reset --network goerli
+
+Compiling your contracts...
+===========================
+^C^C^C^C^C> Everything is up to date, there is nothing to compile.
+MultiSpaces on  master [✘!?] via ⬢ v14.18.0 
+➜ truffle migrate --reset --network goerli
+
+Compiling your contracts...
+===========================
+> Everything is up to date, there is nothing to compile.
+
+
+Migrations dry-run (simulation)
+===============================
+> Network name:    'goerli-fork'
+> Network id:      5
+> Block gas limit: 30000000 (0x1c9c380)
+
+
+1_initial_migration.js
+======================
+
+   Deploying 'Migrations'
+   ----------------------
+   > block number:        7917278
+   > block timestamp:     1667935935
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.840247188363747095
+   > gas used:            250142 (0x3d11e)
+   > gas price:           5.268636973 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001317907389700166 ETH
+
+   -------------------------------------
+   > Total cost:     0.001317907389700166 ETH
+
+
+2_deploy_contracts.js
+=====================
+
+   Deploying 'CreditChecker'
+   -------------------------
+   > block number:        7917280
+   > block timestamp:     1667935938
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.836983987637723245
+   > gas used:            656531 (0xa0493)
+   > gas price:           4.625716644 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003036926374001964 ETH
+
+
+   Deploying 'PubKeyChecker'
+   -------------------------
+   > block number:        7917281
+   > block timestamp:     1667935939
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.834393996740210275
+   > gas used:            592454 (0x90a46)
+   > gas price:           4.371632055 gwei
+   > value sent:          0 ETH
+   > total cost:          0.00258999089751297 ETH
+
+
+   Deploying 'InvitationChecker'
+   -----------------------------
+   > block number:        7917282
+   > block timestamp:     1667935940
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.831785132980786249
+   > gas used:            629109 (0x99975)
+   > gas price:           4.146918514 gwei
+   > value sent:          0 ETH
+   > total cost:          0.002608863759424026 ETH
+
+
+   Deploying 'Bucket'
+   ------------------
+   > block number:        7917283
+   > block timestamp:     1667935942
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.816342458008478731
+   > gas used:            3909847 (0x3ba8d7)
+   > gas price:           3.949687794 gwei
+   > value sent:          0 ETH
+   > total cost:          0.015442674972307518 ETH
+
+
+   Deploying 'Element'
+   -------------------
+   > block number:        7917284
+   > block timestamp:     1667935943
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.807608559653575408
+   > gas used:            2288931 (0x22ed23)
+   > gas price:           3.815710633 gwei
+   > value sent:          0 ETH
+   > total cost:          0.008733898354903323 ETH
+
+
+   Deploying 'BucketFactory'
+   -------------------------
+   > block number:        7917285
+   > block timestamp:     1667935945
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.804919546191916772
+   > gas used:            731437 (0xb292d)
+   > gas price:           3.676343228 gwei
+   > value sent:          0 ETH
+   > total cost:          0.002689013461658636 ETH
+
+
+   Linking
+   -------
+   * Contract: Space <--> Library: PubKeyChecker 
+
+   Linking
+   -------
+   * Contract: Space <--> Library: InvitationChecker 
+
+   Deploying 'Space'
+   -----------------
+   > block number:        7917286
+   > block timestamp:     1667935946
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.786085312203009272
+   > gas used:            5325715 (0x514393)
+   > gas price:           3.5364705 gwei
+   > value sent:          0 ETH
+   > total cost:          0.0188342339889075 ETH
+
+
+   Linking
+   -------
+   * Contract: MultiSpaces <--> Library: CreditChecker 
+
+   Deploying 'MultiSpaces'
+   -----------------------
+   > block number:        7917287
+   > block timestamp:     1667935952
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.772422998740403288
+   > gas used:            3956752 (0x3c6010)
+   > gas price:           3.452911242 gwei
+   > value sent:          0 ETH
+   > total cost:          0.013662313462605984 ETH
+
+Bucket address: 0xCdCFa18838bbAD8b617f8143d7EDE92d5ED63DA4
+Element address: 0x4015764BBEDeE06D512C13Fa47f2e7c7bf3B8048
+BucketFactory address: 0xc6ffD5167da532e70d3F26dd2A308D261E1923dD
+Space address: 0xc7BBb78b9574fC23ee8aa4Bc38bc0A30e5d0b2ee
+MultiSpaces address: 0x53A05c6f256AeC0907d880bf7DEDCFed13466b13
+   -------------------------------------
+   > Total cost:     0.067597915271321921 ETH
+
+Summary
+=======
+> Total deployments:   9
+> Final cost:          0.068915822661022087 ETH
+
+
+
+
+Starting migrations...
+======================
+> Network name:    'goerli'
+> Network id:      5
+> Block gas limit: 30000000 (0x1c9c380)
+
+
+1_initial_migration.js
+======================
+
+   Deploying 'Migrations'
+   ----------------------
+   > transaction hash:    0x824e2a6b2622d675d83daa67c121353f0b83aca155d43b5e45dd45e03b4d7f03
+   > Blocks: 1            Seconds: 12
+   > contract address:    0xf748e648DdD9397fD13a8404eaa4F0D914f36dc9
+   > block number:        7917285
+   > block timestamp:     1667935968
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.840176824126048387
+   > gas used:            250142 (0x3d11e)
+   > gas price:           5.549934147 gwei
+   > value sent:          0 ETH
+   > total cost:          0.001388271627398874 ETH
+
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:     0.001388271627398874 ETH
+
+
+2_deploy_contracts.js
+=====================
+
+   Deploying 'CreditChecker'
+   -------------------------
+   > transaction hash:    0xae2204a6e745456149867b8e588eebd4e530f8b30dbd9232bf114ba6c0e2b070
+   > Blocks: 2            Seconds: 20
+   > contract address:    0x314C0fc15fA4269e672384040ee4D8D60707B512
+   > block number:        7917288
+   > block timestamp:     1667936004
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.836413062073078823
+   > gas used:            656531 (0xa0493)
+   > gas price:           5.318239278 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003491588951424618 ETH
+
+
+   Deploying 'PubKeyChecker'
+   -------------------------
+   > transaction hash:    0x0c7b90e7a179b1656d0cb1ea4059cbdc643228bf38ba511bb842293de2755e12
+   > Blocks: 2            Seconds: 33
+   > contract address:    0x035bA974FEB5dd62857B62ad3bCD8d3bDa36b63e
+   > block number:        7917290
+   > block timestamp:     1667936040
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.833363733164077519
+   > gas used:            592454 (0x90a46)
+   > gas price:           5.146946276 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003049328909001304 ETH
+
+
+   Deploying 'InvitationChecker'
+   -----------------------------
+   > transaction hash:    0x511ec7b1dba6fead9fa06b3c7e7e4e40b4ea7c2bf73d6941847c51d7f29a30e1
+   > Blocks: 0            Seconds: 4
+   > contract address:    0x2B325CC330b8653646b8055B71187a2F1595AA86
+   > block number:        7917291
+   > block timestamp:     1667936052
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.829917778630101253
+   > gas used:            629109 (0x99975)
+   > gas price:           5.477515874 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003445954533976266 ETH
+
+
+   Deploying 'Bucket'
+   ------------------
+   > transaction hash:    0x47b7f23157c6ff37d2e43c59ebd7c733aa2322c6ce441681ae0be64e31e1eb8f
+   > Blocks: 0            Seconds: 4
+   > contract address:    0xCdCFa18838bbAD8b617f8143d7EDE92d5ED63DA4
+   > block number:        7917292
+   > block timestamp:     1667936064
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.808352244618685681
+   > gas used:            3909847 (0x3ba8d7)
+   > gas price:           5.515697676 gwei
+   > value sent:          0 ETH
+   > total cost:          0.021565534011415572 ETH
+
+
+   Deploying 'Element'
+   -------------------
+   > transaction hash:    0x93b52a183d39a7d365abe6b46a377cd60247f5588ab499d960470ce174713bf7
+   > Blocks: 1            Seconds: 16
+   > contract address:    0x4015764BBEDeE06D512C13Fa47f2e7c7bf3B8048
+   > block number:        7917294
+   > block timestamp:     1667936088
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.796817333173595119
+   > gas used:            2288931 (0x22ed23)
+   > gas price:           5.039431702 gwei
+   > value sent:          0 ETH
+   > total cost:          0.011534911445090562 ETH
+
+
+   Deploying 'BucketFactory'
+   -------------------------
+   > transaction hash:    0x4688bc5a41a36e2ec629ea6304307fafe9f1b36d70e25c6ec7410f94563ec8b8
+   > Blocks: 1            Seconds: 8
+   > contract address:    0xc6ffD5167da532e70d3F26dd2A308D261E1923dD
+   > block number:        7917295
+   > block timestamp:     1667936100
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.792902392743697902
+   > gas used:            731437 (0xb292d)
+   > gas price:           5.352395941 gwei
+   > value sent:          0 ETH
+   > total cost:          0.003914940429897217 ETH
+
+
+   Linking
+   -------
+   * Contract: Space <--> Library: PubKeyChecker (at address: 0x035bA974FEB5dd62857B62ad3bCD8d3bDa36b63e)
+
+   Linking
+   -------
+   * Contract: Space <--> Library: InvitationChecker (at address: 0x2B325CC330b8653646b8055B71187a2F1595AA86)
+
+   Deploying 'Space'
+   -----------------
+   > transaction hash:    0xb89e28aafdd36ceac2ccc5966b4ac4ccb06da53b1bd43ba2038a93be54ee35e8
+   > Blocks: 1            Seconds: 16
+   > contract address:    0xc7BBb78b9574fC23ee8aa4Bc38bc0A30e5d0b2ee
+   > block number:        7917297
+   > block timestamp:     1667936124
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.766647748703952437
+   > gas used:            5325715 (0x514393)
+   > gas price:           4.929787651 gwei
+   > value sent:          0 ETH
+   > total cost:          0.026254644039745465 ETH
+
+
+   Linking
+   -------
+   * Contract: MultiSpaces <--> Library: CreditChecker (at address: 0x314C0fc15fA4269e672384040ee4D8D60707B512)
+
+   Deploying 'MultiSpaces'
+   -----------------------
+   > transaction hash:    0x95e58afde4b11104f17c587e8585d6e9a47d1523832f81edf140422c0cd6355f
+   > Blocks: 2            Seconds: 20
+   > contract address:    0x53A05c6f256AeC0907d880bf7DEDCFed13466b13
+   > block number:        7917299
+   > block timestamp:     1667936148
+   > account:             0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D
+   > balance:             1.746971188823661605
+   > gas used:            3956752 (0x3c6010)
+   > gas price:           4.972907041 gwei
+   > value sent:          0 ETH
+   > total cost:          0.019676559880290832 ETH
+
+Bucket address: 0xCdCFa18838bbAD8b617f8143d7EDE92d5ED63DA4
+Element address: 0x4015764BBEDeE06D512C13Fa47f2e7c7bf3B8048
+BucketFactory address: 0xc6ffD5167da532e70d3F26dd2A308D261E1923dD
+Space address: 0xc7BBb78b9574fC23ee8aa4Bc38bc0A30e5d0b2ee
+MultiSpaces address: 0x53A05c6f256AeC0907d880bf7DEDCFed13466b13
+   > Saving migration to chain.
+   > Saving artifacts
+   -------------------------------------
+   > Total cost:     0.092933462200841836 ETH
+
+Summary
+=======
+> Total deployments:   9
+> Final cost:          0.09432173382824071 ETH

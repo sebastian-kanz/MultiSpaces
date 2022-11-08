@@ -11,8 +11,8 @@ abstract contract PaymentAdapter {
   }
 
   modifier charge(IPaymentManager.PayableAction action) {
-    _charge(action);
     _;
+    _charge(action);
   }
 
   function _decreaseLimit(IPaymentManager.LimitedAction action, uint256 amount)
@@ -26,7 +26,7 @@ abstract contract PaymentAdapter {
     _;
   }
 
-  constructor(address pManager) {
+  function _setPaymentManager(address pManager) internal {
     paymentManager = IPaymentManager(pManager);
   }
 }

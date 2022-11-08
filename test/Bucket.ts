@@ -5,8 +5,6 @@ import {
 
 const {
   BN, // Big Number support
-  constants, // Common constants, like the zero address and largest integers
-  expectEvent, // Assertions for emitted events
   expectRevert, // Assertions for transactions that should fail
   time,
 } = require('@openzeppelin/test-helpers');
@@ -15,6 +13,7 @@ const Bucket = artifacts.require('Bucket');
 const ParticipantManager = artifacts.require('ParticipantManager');
 const PubKeyChecker = artifacts.require('PubKeyChecker');
 const InvitationChecker = artifacts.require('InvitationChecker');
+const CreditChecker = artifacts.require('CreditChecker');
 const PaymentManager = artifacts.require('PaymentManager');
 
 contract('Bucket', (accounts) => {
@@ -26,6 +25,8 @@ contract('Bucket', (accounts) => {
     const pubKeyChecker = await PubKeyChecker.new();
     ParticipantManager.link('InvitationChecker', invitationChecker.address);
     ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
+    const creditChecker = await CreditChecker.new();
+    PaymentManager.link('CreditChecker', creditChecker.address);
     // public key of accounts[0]
     const pubKey =
       '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
@@ -39,20 +40,13 @@ contract('Bucket', (accounts) => {
   });
 
   describe('Creating a bucket', () => {
-    it('fails for insufficient fee', async () => {
+    // TODO: Move test to space as payment is now handled there
+    it.skip('fails for insufficient fee', async () => {
       await expectRevert(
         Bucket.new(paymentManager.address, participantManager.address, {
           value: new BN(100),
         }),
         'Insufficient fee'
-      );
-    });
-
-    it('works for sufficient fee', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
       );
     });
 
@@ -188,16 +182,16 @@ contract('Bucket', (accounts) => {
     });
 
     it('decreases limit of participant', async () => {
-      const balance = await paymentManager.getLimit(accounts[0], 0);
-      assert(balance.cmp(new BN(0)) === 0, 'Limit already initialized.');
       const instance = await Bucket.new(
         paymentManager.address,
         participantManager.address,
         { value: new BN(1000000000000000) }
       );
+      const balance = await paymentManager.getLimit(instance.address, 0);
+      assert(balance.cmp(new BN(0)) === 0, 'Limit already initialized.');
       await instance.addKeys(['hash123'], [accounts[0]]);
       await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      const newBalance = await paymentManager.getLimit(accounts[0], 0);
+      const newBalance = await paymentManager.getLimit(instance.address, 0);
       assert(balance.cmp(newBalance) === -1, 'Limit was not initialized.');
       const defaultBalance = await paymentManager.DEFAULT_LIMITS(0);
       assert(defaultBalance.cmp(newBalance) === 1, 'Limit was not decreased.');
@@ -561,7 +555,7 @@ contract('Bucket', (accounts) => {
       await instance.addKeys(['hash123'], [accounts[0]]);
       await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
 
-      const balance = await paymentManager.getLimit(accounts[0], 0);
+      const balance = await paymentManager.getLimit(instance.address, 0);
       await instance.updateElements(
         ['meta'],
         ['newMeta'],
@@ -572,7 +566,7 @@ contract('Bucket', (accounts) => {
         [''],
         0
       );
-      const newBalance = await paymentManager.getLimit(accounts[0], 0);
+      const newBalance = await paymentManager.getLimit(instance.address, 0);
 
       assert(balance.cmp(newBalance) === 1, 'Limit was not decreased.');
     });
