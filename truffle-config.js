@@ -23,7 +23,7 @@ module.exports = {
       networkCheckTimeout: 10000,
     },
     alfajores: {
-      provider: new HDWalletProvider({
+      provider: () => new HDWalletProvider({
         privateKeys: [process.env.ACCOUNT_0_PRIVATE_KEY],
         providerOrUrl: `https://alfajores-forno.celo-testnet.org`
       }),
