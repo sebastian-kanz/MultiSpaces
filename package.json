@@ -46,7 +46,6 @@
     "eth-gas-reporter": "^0.2.25",
     "solidity-coverage": "^0.7.22",
     "truffle": "^5.5.30",
-    "truffle-hdwallet-provider": "^1.0.17",
     "truffle-typings": "^1.0.8",
     "ts-node": "^10.7.0",
     "typechain": "^8.1.0",
