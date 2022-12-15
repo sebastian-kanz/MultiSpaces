@@ -13,6 +13,7 @@
     "migrate": "tsc -p ./tsconfig.migrate.json --outDir migrations && truffle migrate",
     "test": "truffle test",
     "test:goerli": "truffle test --network goerli",
+    "test:matic": "truffle test --network matic",
     "ganache-cli": "ganache-cli -p 7545 --gasLimit=0x1fffffffffffff --allowUnlimitedContractSize -e 1000000000 > /dev/null &",
     "coverage": "truffle run coverage --solcoverjs ./.solcover.js --network coverage",
     "typecheck": "tsc --noEmit",
