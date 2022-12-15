@@ -1,24 +1,26 @@
+import { getAccountKeys } from '../keys.helper';
+
 const CreditChecker = artifacts.require('CreditChecker');
 
-contract('CreditChecker', (accounts) => {
+const { ACCOUNT_0_PRIVATE_KEY, ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } =
+  getAccountKeys();
+
+contract('CreditChecker', () => {
   describe('Validating credits', () => {
     it('identifies correct signature', async () => {
-      await web3.eth.accounts.wallet.create(2);
-      const newAccount = web3.eth.accounts.wallet[0];
-
       const credit = 1;
       const random = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(credit, random) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
       const signResult = await web3.eth.accounts.sign(
         hash,
-        newAccount.privateKey
+        ACCOUNT_0_PRIVATE_KEY
       );
       const instance = await CreditChecker.new();
 
       const result = await instance.isValidCredit(
         signResult.signature,
-        newAccount.address,
+        ACCOUNT_0_ADDRESS,
         credit,
         random
       );
@@ -27,22 +29,19 @@ contract('CreditChecker', (accounts) => {
     });
 
     it('fails for invalid invitation code', async () => {
-      await web3.eth.accounts.wallet.create(2);
-      const newAccount = web3.eth.accounts.wallet[0];
-
       const credit = 1;
       const random = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(credit, random) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
       const signResult = await web3.eth.accounts.sign(
         hash,
-        newAccount.privateKey
+        ACCOUNT_0_PRIVATE_KEY
       );
       const instance = await CreditChecker.new();
 
       const result = await instance.isValidCredit(
         signResult.signature,
-        newAccount.address,
+        ACCOUNT_0_ADDRESS,
         credit,
         'invalid'
       );
@@ -51,22 +50,19 @@ contract('CreditChecker', (accounts) => {
     });
 
     it('identifies invalid signer', async () => {
-      await web3.eth.accounts.wallet.create(2);
-      const newAccount = web3.eth.accounts.wallet[0];
-
       const credit = 1;
       const random = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(credit, random) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
       const signResult = await web3.eth.accounts.sign(
         hash,
-        newAccount.privateKey
+        ACCOUNT_0_PRIVATE_KEY
       );
       const instance = await CreditChecker.new();
 
       const result = await instance.isValidCredit(
         signResult.signature,
-        accounts[0],
+        ACCOUNT_1_ADDRESS,
         credit,
         random
       );

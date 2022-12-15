@@ -5,6 +5,8 @@ import './libraries/CreditChecker.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/utils/Strings.sol';
 
+// PayableActions are payed by a space / bucket (vouchers, credits, freeOfCharge) or by its user via msg.value
+// LimitedActions are never "payed" by a user but by the bucket (limit will decrease)
 contract PaymentManager is IPaymentManager, Ownable {
   using CreditChecker for bytes;
 
@@ -16,23 +18,22 @@ contract PaymentManager is IPaymentManager, Ownable {
 
   mapping(address => mapping(LimitedAction => uint256)) private limits;
   mapping(address => bool) private limitsInitialized;
+  mapping(address => mapping(LimitedAction => bool))
+    private unlimitedLimitedActions;
 
   mapping(address => uint256) private credits;
   mapping(bytes32 => bool) private allCredits;
 
-  constructor(uint256 baseFee, uint256 baseLimit) {
+  uint256 public limitPrice; // how many wei for one limit
+
+  constructor(
+    uint256 baseFee,
+    uint256 baseLimit,
+    uint256 price
+  ) {
     _updateDefaultPayments(baseFee);
     _updateDefaultLimits(baseLimit);
-  }
-
-  function _updateDefaultPayments(uint256 baseFee) internal {
-    DEFAULT_PAYMENTS[PayableAction.CREATE_SPACE] = baseFee;
-    DEFAULT_PAYMENTS[PayableAction.ADD_BUCKET] = baseFee;
-    DEFAULT_PAYMENTS[PayableAction.ADD_PARTICIPANT] = baseFee;
-  }
-
-  function _updateDefaultLimits(uint256 limit) internal {
-    DEFAULT_LIMITS[LimitedAction.ADD_DATA] = limit;
+    limitPrice = price;
   }
 
   // Anyone can decrease his own limit
@@ -40,30 +41,52 @@ contract PaymentManager is IPaymentManager, Ownable {
     external
     override
   {
-    initLimts();
-    require(limits[msg.sender][action] >= amount, 'Limit depleted');
-    limits[msg.sender][action] -= amount;
-    emit LimitedActionEvent(action, msg.sender, limits[msg.sender][action]);
+    initLimits();
+    if (!unlimitedLimitedActions[msg.sender][action]) {
+      require(limits[msg.sender][action] >= amount, 'Limit depleted');
+      limits[msg.sender][action] -= amount;
+      emit LimitedActionEvent(
+        action,
+        msg.sender,
+        msg.sender,
+        limits[msg.sender][action],
+        false
+      );
+    } else {
+      emit LimitedActionEvent(
+        action,
+        msg.sender,
+        msg.sender,
+        limits[msg.sender][action],
+        true
+      );
+    }
   }
 
-  // Only owner can increase someone's limit
+  // Only owner can increase someone's limit without paying. Everyone else has to pay.
+  // Attention: Use bucket address here!
   function increaseLimit(
     LimitedAction action,
     uint256 amount,
-    address account
-  ) external override onlyOwner {
-    initLimts();
-    limits[account][action] += amount;
-    emit LimitedActionEvent(action, account, limits[account][action]);
-  }
-
-  function initLimts() private {
-    if (!limitsInitialized[msg.sender]) {
-      limits[msg.sender][LimitedAction.ADD_DATA] = DEFAULT_LIMITS[
-        LimitedAction.ADD_DATA
-      ];
-      limitsInitialized[msg.sender] = true;
+    address bucket
+  ) external payable override {
+    require(
+      !unlimitedLimitedActions[msg.sender][action],
+      'Account is unlimited. Can not increase limit.'
+    );
+    initLimits();
+    if (msg.sender != owner()) {
+      require(amount == msg.value, 'Amount and sent value mismatch.');
     }
+    // Note: rest of value will be retained
+    limits[bucket][action] += amount / limitPrice;
+    emit LimitedActionEvent(
+      action,
+      msg.sender,
+      bucket,
+      limits[bucket][action],
+      false
+    );
   }
 
   /// Vouchers are bound to a specific payable action and credited by the manufacturer
@@ -98,7 +121,7 @@ contract PaymentManager is IPaymentManager, Ownable {
     }
   }
 
-  function addCredits(
+  function redeemCredit(
     address receiver,
     uint256 credit,
     string memory random,
@@ -128,10 +151,10 @@ contract PaymentManager is IPaymentManager, Ownable {
 
   function getLimit(address account, LimitedAction action)
     external
-    view
     override
     returns (uint256)
   {
+    initLimits(account);
     return limits[account][action];
   }
 
@@ -153,36 +176,71 @@ contract PaymentManager is IPaymentManager, Ownable {
     return freeOfChargePayableActions[account][action];
   }
 
-  function unleashPayableActionForAccount(address user, PayableAction action)
+  function isUnlimited(address account, LimitedAction action)
     external
+    view
     override
-    onlyOwner
+    returns (bool)
   {
-    freeOfChargePayableActions[user][action] = true;
+    return unlimitedLimitedActions[account][action];
+  }
+
+  function increaseCredits(address receiver) external payable override {
+    credits[receiver] = credits[receiver] + msg.value;
+  }
+
+  receive() external payable {
+    credits[msg.sender] = credits[msg.sender] + msg.value;
+  }
+
+  fallback() external payable {
+    credits[msg.sender] = credits[msg.sender] + msg.value;
+  }
+
+  function transferCredits(uint256 amount, address receiver)
+    external
+    payable
+    override
+  {
+    require(credits[msg.sender] >= amount, 'Insufficient credits');
+    credits[msg.sender] -= amount;
+    credits[receiver] += amount;
+  }
+
+  // ### OWNER FUNCTIONS ###
+
+  function setAccountFreeOfCharge(
+    address account,
+    PayableAction action,
+    bool enable
+  ) external override onlyOwner {
+    freeOfChargePayableActions[account][action] = enable;
+  }
+
+  function setAccountUnlimited(
+    address account,
+    LimitedAction action,
+    bool enable
+  ) external override onlyOwner {
+    initLimits(account);
+    unlimitedLimitedActions[account][action] = enable;
   }
 
   function addVoucher(
-    address user,
+    address adr,
     PayableAction action,
     uint256 amount
   ) external override onlyOwner {
-    vouchers[user][action] += amount;
+    vouchers[adr][action] += amount;
   }
 
   function addLimit(
-    address user,
+    address adr,
     LimitedAction action,
     uint256 amount
   ) external override onlyOwner {
-    limits[user][action] += amount;
-  }
-
-  function manufacturerWithdraw() external override onlyOwner {
-    address manufacturer = owner();
-    address payable self = payable(address(this));
-    uint256 balance = self.balance;
-    (bool sent, ) = manufacturer.call{ value: balance }('');
-    require(sent, 'Sending failed');
+    initLimits(adr);
+    limits[adr][action] += amount;
   }
 
   function setDefaultFee(uint256 newBaseFee) external override onlyOwner {
@@ -193,15 +251,40 @@ contract PaymentManager is IPaymentManager, Ownable {
     _updateDefaultLimits(newBaseLimit);
   }
 
-  function increaseCredits(address receiver) external payable {
-    credits[receiver] = credits[receiver] + msg.value;
+  function manufacturerWithdraw() external override onlyOwner {
+    address manufacturer = owner();
+    address payable self = payable(address(this));
+    uint256 balance = self.balance;
+    (bool sent, ) = manufacturer.call{ value: balance }('');
+    require(sent, 'Sending failed');
   }
 
-  receive() external payable {
-    credits[msg.sender] = credits[msg.sender] + msg.value;
+  function setLimitPrice(uint256 price) external override onlyOwner {
+    limitPrice = price;
   }
 
-  fallback() external payable {
-    credits[msg.sender] = credits[msg.sender] + msg.value;
+  // ### INTERNAL ###
+
+  function _updateDefaultPayments(uint256 baseFee) internal {
+    DEFAULT_PAYMENTS[PayableAction.CREATE_SPACE] = baseFee;
+    DEFAULT_PAYMENTS[PayableAction.ADD_BUCKET] = baseFee;
+    DEFAULT_PAYMENTS[PayableAction.ADD_PARTICIPANT] = baseFee;
+  }
+
+  function _updateDefaultLimits(uint256 limit) internal {
+    DEFAULT_LIMITS[LimitedAction.ADD_DATA] = limit;
+  }
+
+  function initLimits() private {
+    initLimits(msg.sender);
+  }
+
+  function initLimits(address account) private {
+    if (!limitsInitialized[account]) {
+      limits[account][LimitedAction.ADD_DATA] = DEFAULT_LIMITS[
+        LimitedAction.ADD_DATA
+      ];
+      limitsInitialized[account] = true;
+    }
   }
 }

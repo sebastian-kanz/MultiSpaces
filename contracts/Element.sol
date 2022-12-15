@@ -14,25 +14,36 @@ contract Element is Initializable, ParticipantManagerAdapter {
   string public metaHash;
   string public dataHash;
   string public containerHash;
-
   uint256 public contentType;
   uint256 public creationTime;
-
   address public creator;
-
   address public parentElement;
   address public previousElement;
   address public nextElement;
 
-  Bucket private parentBucket;
+  Bucket public parentBucket;
+  Element public elemImpl;
+
+  mapping(address => bool) public holders;
+  uint256 public holdersCount;
+  LibElement.RedundancyLevel public minRedundancy;
+  LibElement.RedundancyLevel public redundancy;
+
+  event Request(
+    address indexed _elem,
+    address indexed requestor,
+    uint256 indexed time
+  );
 
   function initialize(
     LibElement.AddressBundle memory addresses,
     LibElement.HashBundle memory hashes,
-    uint256 cType
+    uint256 cType,
+    LibElement.RedundancyLevel mRedundandy
   ) external initializer {
     _setParticipantManager(addresses.participantManager);
     parentBucket = Bucket(addresses.bucket);
+    elemImpl = Element(addresses.elemImpl);
 
     require(!parentBucket.hashExists(hashes.meta), 'Meta already exists');
     require(!parentBucket.hashExists(hashes.data), 'Data already exists');
@@ -51,7 +62,13 @@ contract Element is Initializable, ParticipantManagerAdapter {
 
     creator = addresses.creator;
     Bucket bucket = Bucket(parentBucket);
-    bucket.notifyCreation(this, creator);
+    bucket.notifyCreation(creator);
+
+    holders[addresses.creator] = true;
+    holdersCount++;
+
+    minRedundancy = mRedundandy;
+    redundancy = LibElement.RedundancyLevel.SINGLE;
   }
 
   function update(LibElement.HashBundle memory hashes, address parent)
@@ -75,18 +92,21 @@ contract Element is Initializable, ParticipantManagerAdapter {
       address(participantManager),
       parent,
       address(this),
-      address(parentBucket)
+      address(parentBucket),
+      address(elemImpl)
     );
-    Element updatedElement = Element(address(this).clone());
-    updatedElement.initialize(addresses, hashes, contentType);
-
+    Element updatedElement = Element(address(elemImpl).clone());
+    Bucket(parentBucket).preRegisterElement(updatedElement);
+    updatedElement.initialize(addresses, hashes, contentType, minRedundancy);
+    Bucket(parentBucket).notifyUpdate(updatedElement, msg.sender);
     nextElement = address(updatedElement);
-
-    creator = addresses.creator;
-    Bucket(parentBucket).notifyUpdate(this, msg.sender);
   }
 
   function remove() external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
+    require(
+      redundancy == LibElement.RedundancyLevel.NONE,
+      'Wrong redundancy level. Can not remove.'
+    );
     nextElement = address(0);
     Bucket(parentBucket).notifyDelete(this, msg.sender);
   }
@@ -100,6 +120,38 @@ contract Element is Initializable, ParticipantManagerAdapter {
   }
 
   function requestData() external {
-    emit LibElement.Request(address(this), msg.sender, block.number);
+    emit Request(address(this), msg.sender, block.number);
+  }
+
+  function announceHolding()
+    external
+    onlyRole(LibParticipant.PARTICIPANT_ROLE)
+  {
+    if (!holders[msg.sender]) {
+      holdersCount++;
+    }
+    holders[msg.sender] = true;
+  }
+
+  function announceRemoval()
+    external
+    onlyRole(LibParticipant.PARTICIPANT_ROLE)
+  {
+    if (holders[msg.sender]) {
+      holdersCount--;
+    }
+    holders[msg.sender] = false;
+  }
+
+  function setRedundancyLevel(LibElement.RedundancyLevel level)
+    external
+    onlyRole(LibParticipant.PARTICIPANT_ROLE)
+  {
+    emit LibElement.RedundancyLevelChanged(
+      address(this),
+      uint256(redundancy),
+      uint256(level)
+    );
+    redundancy = level;
   }
 }

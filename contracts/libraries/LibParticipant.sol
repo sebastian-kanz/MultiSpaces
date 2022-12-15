@@ -10,7 +10,7 @@ library LibParticipant {
   }
 
   bytes32 public constant PARTICIPANT_ROLE = keccak256('PARTICIPANT');
-  bytes32 public constant UPDATEOR_ROLE = keccak256('UPDATEOR');
+  bytes32 public constant UPDATER_ROLE = keccak256('UPDATER');
   bytes32 public constant MANAGER_ROLE = keccak256('MANAGER');
   bytes32 public constant OWNER_ROLE = keccak256('OWNER');
 }

@@ -8,17 +8,17 @@ import '@openzeppelin/contracts/proxy/Clones.sol';
 
 contract MultiSpaces is Ownable {
   using Clones for address;
-  // TODO: Use minimal proxy here instead of real instance. Makes deployment while cloning much cheaper
   address spaceImplementation;
   address[] public spaces;
   mapping(bytes => address) public ownedSpaces;
-  uint256 public baseFee = 1000000000000000;
-  uint256 public baseLimit = 100;
+  uint256 public constant baseFee = 1000000000000000;
+  uint256 public constant baseLimit = 100;
+  uint256 public constant limitPrice = 1000000000000;
   PaymentManager public paymentManager;
   BucketFactory public bucketFactory;
 
   constructor(BucketFactory bfactory, address impl) {
-    paymentManager = new PaymentManager(baseFee, baseLimit);
+    paymentManager = new PaymentManager(baseFee, baseLimit, limitPrice);
     paymentManager.transferOwnership(owner());
     bucketFactory = bfactory;
     spaceImplementation = impl;
@@ -57,5 +57,17 @@ contract MultiSpaces is Ownable {
 
   function _sendToPaymentManager() private {
     paymentManager.increaseCredits{ value: msg.value }(msg.sender);
+  }
+
+  function setBucketImplementation(address impl) public onlyOwner {
+    bucketFactory.setBucketImplementation(impl);
+  }
+
+  function setElementImplementation(address impl) public onlyOwner {
+    bucketFactory.setElementImplementation(impl);
+  }
+
+  function setPaymentManager(address payable impl) public onlyOwner {
+    paymentManager = PaymentManager(impl);
   }
 }

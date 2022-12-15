@@ -4,6 +4,17 @@ pragma solidity ^0.8.12;
 interface IParticipantManager {
   function hasRole(bytes32 role, address account) external view returns (bool);
 
+  // function hasRoleAuthorized(
+  //   bytes32 role,
+  //   address issuer,
+  //   address holder
+  // ) external view returns (bool);
+
+  // function authorizedSender(address issuer, address holder)
+  //   external
+  //   view
+  //   returns (address);
+
   function participantCount() external view returns (uint256);
 
   function removeParticipation(address participant) external;

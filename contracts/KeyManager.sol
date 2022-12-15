@@ -1,24 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-//TODO: Instead of using key hashes, use encyrypted keys! So keys will be securely stored onchain!
 // As long as one participant in the same epoch can read its key, all other can be re-constructed
 abstract contract KeyManager {
   mapping(uint256 => mapping(address => string)) epochToParticipantToKeyMapping;
   uint256 public GENESIS;
   uint256 public constant EPOCH = 100;
 
-  constructor() {
-    GENESIS = block.number;
-  }
-
   modifier keyAvailable(uint256 blockNumber, address participant) {
-    _keyHashAvailable(blockNumber, participant);
+    _keyAvailable(blockNumber, participant);
     _;
   }
 
   modifier keyMissing(uint256 blockNumber, address participant) {
-    _keyHashMissing(blockNumber, participant);
+    _keyMissing(blockNumber, participant);
     _;
   }
 
@@ -31,7 +26,7 @@ abstract contract KeyManager {
     return (blockNumber - GENESIS) / EPOCH;
   }
 
-  function _keyHashAvailable(uint256 blockNumber, address participant)
+  function _keyAvailable(uint256 blockNumber, address participant)
     private
     view
   {
@@ -45,10 +40,7 @@ abstract contract KeyManager {
     );
   }
 
-  function _keyHashMissing(uint256 blockNumber, address participant)
-    private
-    view
-  {
+  function _keyMissing(uint256 blockNumber, address participant) private view {
     require(
       keccak256(
         bytes(
@@ -59,7 +51,7 @@ abstract contract KeyManager {
     );
   }
 
-  /// @notice Gets a key hash for a specific block number and participant
+  /// @notice Gets a key for a specific block number and participant
   function getKey(address participant, uint256 blockNumber)
     external
     view
@@ -68,38 +60,35 @@ abstract contract KeyManager {
     return epochToParticipantToKeyMapping[_epochAt(blockNumber)][participant];
   }
 
-  /// @notice Sets the hash for a specific participant
-  /// @param keyHash hash of the key
+  /// @notice Sets the key for a specific participant
+  /// @param key the key
   /// @param participant address of the participant that can use (and decrypt) the key
-  function _addKey(string memory keyHash, address participant)
+  function _addKey(string memory key, address participant)
     private
     keyMissing(block.number, participant)
   {
-    epochToParticipantToKeyMapping[_currentEpoch()][participant] = keyHash;
+    epochToParticipantToKeyMapping[_currentEpoch()][participant] = key;
   }
 
-  function _addKeys(string[] memory keyHashes, address[] memory participants)
+  function _addKeys(string[] memory keys, address[] memory participants)
     internal
   {
-    require(keyHashes.length == participants.length, 'Invalid keys.');
-    for (uint256 index = 0; index < keyHashes.length; index++) {
-      _addKey(keyHashes[index], participants[index]);
+    for (uint256 index = 0; index < keys.length; index++) {
+      _addKey(keys[index], participants[index]);
     }
   }
 
-  /// @notice Sets the hash for a specific participant
-  /// @param keyHash hash of the key
+  /// @notice Sets the key for a specific participant
+  /// @param key the key
   /// @param participant address of the participant that can use (and decrypt) the key
   /// @param blockNumber specific block in the past
   function _setKeyForParticipant(
-    string memory keyHash,
+    string memory key,
     address participant,
     uint256 blockNumber
   ) internal keyMissing(blockNumber, participant) {
     require(block.number > blockNumber, 'Block time in future.');
     _epochAt(blockNumber);
-    epochToParticipantToKeyMapping[_epochAt(blockNumber)][
-      participant
-    ] = keyHash;
+    epochToParticipantToKeyMapping[_epochAt(blockNumber)][participant] = key;
   }
 }

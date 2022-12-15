@@ -3,13 +3,13 @@ pragma solidity ^0.8.12;
 
 interface IPaymentManager {
   enum PayableAction {
-    CREATE_SPACE,
-    ADD_BUCKET,
-    ADD_PARTICIPANT
+    CREATE_SPACE, // Payed by space
+    ADD_BUCKET, // Payed by space
+    ADD_PARTICIPANT // Payed by bucket
   }
 
   enum LimitedAction {
-    ADD_DATA
+    ADD_DATA // Payed by bucket
   }
 
   event PayableActionEvent(
@@ -23,7 +23,9 @@ interface IPaymentManager {
   event LimitedActionEvent(
     LimitedAction indexed _action,
     address indexed _sender,
-    uint256 limitLeftOver
+    address indexed _owner,
+    uint256 limitLeftOver,
+    bool unlimited
   );
 
   function decreaseLimit(LimitedAction action, uint256 amount) external;
@@ -31,12 +33,12 @@ interface IPaymentManager {
   function increaseLimit(
     LimitedAction action,
     uint256 amount,
-    address account
-  ) external;
+    address bucket
+  ) external payable;
 
   function chargeFee(PayableAction action) external payable;
 
-  function addCredits(
+  function redeemCredit(
     address receiver,
     uint256 credit,
     string memory random,
@@ -47,7 +49,6 @@ interface IPaymentManager {
 
   function getLimit(address account, LimitedAction action)
     external
-    view
     returns (uint256);
 
   function getVoucherCount(address account, PayableAction action)
@@ -60,17 +61,37 @@ interface IPaymentManager {
     view
     returns (bool);
 
-  function unleashPayableActionForAccount(address user, PayableAction action)
-    external;
+  function isUnlimited(address account, LimitedAction action)
+    external
+    view
+    returns (bool);
+
+  function increaseCredits(address receiver) external payable;
+
+  function transferCredits(uint256 amount, address receiver) external payable;
+
+  // ### OWNER FUNCTIONS ###
+
+  function setAccountFreeOfCharge(
+    address account,
+    PayableAction action,
+    bool enable
+  ) external;
+
+  function setAccountUnlimited(
+    address account,
+    LimitedAction action,
+    bool enable
+  ) external;
 
   function addVoucher(
-    address user,
+    address adr,
     PayableAction action,
     uint256 amount
   ) external;
 
   function addLimit(
-    address user,
+    address adr,
     LimitedAction action,
     uint256 amount
   ) external;
@@ -80,4 +101,6 @@ interface IPaymentManager {
   function setDefaultLimit(uint256 newBaseLimit) external;
 
   function manufacturerWithdraw() external;
+
+  function setLimitPrice(uint256) external;
 }

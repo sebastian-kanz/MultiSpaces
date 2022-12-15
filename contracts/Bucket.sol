@@ -9,6 +9,8 @@ import './libraries/LibParticipant.sol';
 import './libraries/LibElement.sol';
 import '@openzeppelin/contracts/proxy/utils/Initializable.sol';
 import '@openzeppelin/contracts/proxy/Clones.sol';
+import '@openzeppelin/contracts/utils/Strings.sol';
+import '@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol';
 
 contract Bucket is
   IBucket,
@@ -23,6 +25,33 @@ contract Bucket is
   mapping(address => bool) public registeredElements;
   mapping(string => bool) public hashExists;
   LibElement.Operation[] public history;
+  LibElement.RedundancyLevel public minElementRedundancy;
+
+  event Create(
+    address indexed _elem,
+    uint256 indexed _blockNumber,
+    address indexed _sender
+  );
+
+  event Update(
+    address indexed _prevElem,
+    address indexed _newElemt,
+    uint256 _blockNumber,
+    address indexed _sender
+  );
+
+  event UpdateParent(
+    address indexed _elem,
+    address indexed _parent,
+    uint256 _blockNumber,
+    address indexed _sender
+  );
+
+  event Delete(
+    address indexed _elem,
+    uint256 _blockNumber,
+    address indexed _sender
+  );
 
   function initialize(
     address pManager,
@@ -32,6 +61,8 @@ contract Bucket is
     _setPaymentManager(pManager);
     _setParticipantManager(partManager);
     elementImpl = impl;
+    GENESIS = block.number;
+    minElementRedundancy = LibElement.RedundancyLevel.SINGLE;
   }
 
   function addKeys(string[] memory newHashes, address[] memory participants)
@@ -79,7 +110,6 @@ contract Bucket is
     require(parents.length == elementsCount, 'Invalid parents length!');
     for (uint256 i = 0; i < elementsCount; i++) {
       Element elem = Element(elementImpl.clone());
-      _addElement(elem);
       LibElement.HashBundle memory hashes = LibElement.HashBundle(
         newMetaHashes[i],
         newDataHashes[i],
@@ -90,9 +120,12 @@ contract Bucket is
         address(participantManager),
         parents[i],
         address(0),
-        address(this)
+        address(this),
+        elementImpl
       );
-      elem.initialize(addresses, hashes, contentType);
+      registeredElements[address(elem)] = true;
+      elem.initialize(addresses, hashes, contentType, minElementRedundancy);
+      _addElement(elem);
     }
   }
 
@@ -130,12 +163,7 @@ contract Bucket is
     bytes memory signature,
     string memory randomCode,
     bytes memory pubKey
-  )
-    external
-    payable
-    charge(IPaymentManager.PayableAction.ADD_PARTICIPANT)
-    onlyRole(LibParticipant.PARTICIPANT_ROLE)
-  {
+  ) external payable charge(IPaymentManager.PayableAction.ADD_PARTICIPANT) {
     _redeemParticipationCode(
       name,
       inviter,
@@ -146,14 +174,15 @@ contract Bucket is
     );
   }
 
-  function removeParticipation(address participant)
+  function removeParticipation()
     external
     onlyRole(LibParticipant.PARTICIPANT_ROLE)
   {
-    _removeParticipation(participant);
+    require(participantCount() > 1, 'Last participant. Use close instead.');
+    _removeParticipation(msg.sender);
   }
 
-  function _addElement(Element elem) internal {
+  function _addElement(Element elem) internal virtual {
     allElements.push(address(elem));
     registeredElements[address(elem)] = true;
     hashExists[elem.metaHash()] = true;
@@ -164,7 +193,13 @@ contract Bucket is
   function _requireRegisteredElement() internal view {
     require(
       registeredElements[msg.sender],
-      'Only callable from registered element!'
+      // 'Only callable from registered element!'
+      string(
+        abi.encodePacked(
+          'Only callable from registered element! Invalid sender: ',
+          Strings.toHexString(uint160(msg.sender), 20)
+        )
+      )
     );
   }
 
@@ -173,18 +208,19 @@ contract Bucket is
     _;
   }
 
-  function notifyCreation(Element elem, address sender)
-    external
-    onlyRegisteredElement
-  {
+  function notifyCreation(address sender) external onlyRegisteredElement {
     history.push(
       LibElement.Operation(
-        address(elem),
+        msg.sender,
         LibElement.OperationType.ADD,
         block.number
       )
     );
-    emit LibElement.Create(address(elem), block.number, sender);
+    emit Create(msg.sender, block.number, sender);
+  }
+
+  function preRegisterElement(Element elem) external onlyRegisteredElement {
+    registeredElements[address(elem)] = true;
   }
 
   function notifyUpdate(Element elem, address sender)
@@ -201,12 +237,7 @@ contract Bucket is
         block.number
       )
     );
-    emit LibElement.Update(
-      address(elem),
-      elem.nextElement(),
-      block.number,
-      sender
-    );
+    emit Update(msg.sender, address(elem), block.number, sender);
   }
 
   function notifyUpdateParent(Element elem, address sender)
@@ -220,7 +251,7 @@ contract Bucket is
         block.number
       )
     );
-    emit LibElement.UpdateParent(
+    emit UpdateParent(
       address(elem),
       elem.parentElement(),
       block.number,
@@ -242,6 +273,20 @@ contract Bucket is
         block.number
       )
     );
-    emit LibElement.Delete(address(elem), block.number, sender);
+    emit Delete(address(elem), block.number, sender);
+  }
+
+  function setElementImplementation(address impl)
+    external
+    onlyRole(LibParticipant.OWNER_ROLE)
+  {
+    elementImpl = impl;
+  }
+
+  function setMinElementRedundancy(LibElement.RedundancyLevel level)
+    external
+    onlyRole(LibParticipant.OWNER_ROLE)
+  {
+    minElementRedundancy = level;
   }
 }

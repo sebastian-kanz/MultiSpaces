@@ -1,24 +1,42 @@
 import {
+  BucketMockInstance,
+  BucketInstance,
+  ElementInstance,
   ParticipantManagerInstance,
   PaymentManagerInstance,
 } from '../types/truffle-contracts';
+import { getAccountKeys } from './keys.helper';
+const truffleAssert = require('truffle-assertions');
+const truffleEvent = require('truffle-events');
 
 const {
-  BN, // Big Number support
-  expectRevert, // Assertions for transactions that should fail
-  time,
+  BN,
+  expectRevert,
+  constants,
+  expectEvent,
 } = require('@openzeppelin/test-helpers');
 
 const Bucket = artifacts.require('Bucket');
+const BucketMock = artifacts.require('BucketMock');
 const ParticipantManager = artifacts.require('ParticipantManager');
 const PubKeyChecker = artifacts.require('PubKeyChecker');
 const InvitationChecker = artifacts.require('InvitationChecker');
 const CreditChecker = artifacts.require('CreditChecker');
 const PaymentManager = artifacts.require('PaymentManager');
+const Element = artifacts.require('Element');
 
-contract('Bucket', (accounts) => {
+const {
+  ACCOUNT_0_PUBLIC_KEY,
+  ACCOUNT_0_ADDRESS,
+  ACCOUNT_0_PRIVATE_KEY,
+  ACCOUNT_1_ADDRESS,
+  ACCOUNT_1_PUBLIC_KEY,
+} = getAccountKeys();
+
+contract('Bucket', () => {
   let participantManager: ParticipantManagerInstance;
   let paymentManager: PaymentManagerInstance;
+  let element: ElementInstance;
 
   beforeEach(async () => {
     const invitationChecker = await InvitationChecker.new();
@@ -27,128 +45,187 @@ contract('Bucket', (accounts) => {
     ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
     const creditChecker = await CreditChecker.new();
     PaymentManager.link('CreditChecker', creditChecker.address);
-    // public key of accounts[0]
-    const pubKey =
-      '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
-    paymentManager = await PaymentManager.new(1000000000000000, 100);
+    paymentManager = await PaymentManager.new(
+      1000000000000000,
+      100,
+      1000000000000
+    );
     participantManager = await ParticipantManager.new(
       'Peter Parker',
-      accounts[0],
-      pubKey,
+      ACCOUNT_0_ADDRESS,
+      ACCOUNT_0_PUBLIC_KEY,
       paymentManager.address
     );
+    element = await Element.new();
   });
 
-  describe('Creating a bucket', () => {
-    // TODO: Move test to space as payment is now handled there
-    it.skip('fails for insufficient fee', async () => {
-      await expectRevert(
-        Bucket.new(paymentManager.address, participantManager.address, {
-          value: new BN(100),
-        }),
-        'Insufficient fee'
-      );
-    });
+  const createNewBucket = async (enableMock = false) => {
+    let instance: BucketMockInstance | BucketInstance;
+    if (enableMock) {
+      instance = await BucketMock.new();
+    } else {
+      instance = await Bucket.new();
+    }
+    await instance.initialize(
+      paymentManager.address,
+      participantManager.address,
+      element.address
+    );
+    await participantManager.grantRole('0x00', instance.address);
+    return instance;
+  };
 
-    it('works for sufficient fee', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+  const getParticipationCodePayload = async () => {
+    const randomCode = 'This is a random invitation code';
+    const hash = web3.utils.soliditySha3(randomCode) ?? '';
+    // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
+    const signResult = await web3.eth.accounts.sign(
+      hash,
+      ACCOUNT_0_PRIVATE_KEY
+    );
+    return {
+      inviter: ACCOUNT_0_ADDRESS,
+      signature: signResult.signature,
+      randomCode,
+    };
+  };
+
+  describe('Creating a bucket', () => {
+    it('Works as expected', async () => {
+      const instance = await createNewBucket();
+      const expectedBlockNumber = await (
+        await web3.eth.getTransaction(instance.transactionHash)
+      ).blockNumber;
+      const genesis = await instance.GENESIS();
+      const minRedundancy = await instance.minElementRedundancy();
+      assert(minRedundancy.eq(new BN(1)), 'False initial minimal redundancy!');
+      assert(
+        genesis.sub(new BN(1)).eq(new BN(expectedBlockNumber)),
+        'False genesis block number!'
       );
     });
   });
 
   describe('Closing a bucket', () => {
     it('Works as expected', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       await instance.closeBucket();
     });
 
     it('Only works for owner', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.closeBucket({ from: accounts[1] }),
+        instance.closeBucket({ from: ACCOUNT_1_ADDRESS }),
         'is missing role'
       );
     });
   });
 
   describe('Keys', () => {
-    it('can be read per participant', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+    it('can only be added from a participant', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.addKeys(['key123'], [ACCOUNT_1_ADDRESS], {
+          from: ACCOUNT_1_ADDRESS,
+        }),
+        'is missing role'
       );
-      const result = await instance.addKeys(['hash123'], [accounts[0]]);
+      await instance.addKeys(['key123'], [ACCOUNT_1_ADDRESS], {
+        from: ACCOUNT_0_ADDRESS,
+      });
+    });
+
+    it('are checked on adding', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.addKeys([], [ACCOUNT_1_ADDRESS], {
+          from: ACCOUNT_0_ADDRESS,
+        }),
+        'Invalid input'
+      );
+      await expectRevert(
+        instance.addKeys(['key123'], [], {
+          from: ACCOUNT_0_ADDRESS,
+        }),
+        'Invalid input'
+      );
+    });
+
+    it('can be read per participant', async () => {
+      const instance = await createNewBucket();
+      const result = await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
       const blockNumber = (new BN(result.receipt.blockNumber) as BN).toNumber();
       const epoch = await instance.EPOCH();
-      const key = await instance.getKey(accounts[0], blockNumber);
-      // minus 2 because of 0 index (0-99) and because the block in blockNumber is the one mined after the epoch is created
+      const key = await instance.getKey(ACCOUNT_0_ADDRESS, blockNumber);
+      // minus 3 because of 0 index (0-99), the block in blockNumber is the one before the transaction creating the contract is mined and one block is already passed by
       const key2 = await instance.getKey(
-        accounts[0],
-        blockNumber + epoch.toNumber() - 2
+        ACCOUNT_0_ADDRESS,
+        blockNumber + epoch.toNumber() - 3
       );
-
       assert(key === 'hash123', 'Key invalid.');
       assert(key === key2, 'Key2 invalid.');
     });
 
     it('can not be set before contract creation', async () => {
       const rootNumber = await web3.eth.getBlockNumber();
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.setKeyForParticipant('keyHash', accounts[0], rootNumber),
+        instance.setKeyForParticipant('keyHash', ACCOUNT_0_ADDRESS, rootNumber),
         'Block number before genesis.'
       );
     });
 
     it('can be set per participant after contract creation', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       const blockNumber = await web3.eth.getBlockNumber();
-      await instance.setKeyForParticipant('keyHash', accounts[0], blockNumber);
+      await instance.setKeyForParticipant(
+        'keyHash',
+        ACCOUNT_0_ADDRESS,
+        blockNumber
+      );
+    });
+
+    it('can be set for participant only from a participant', async () => {
+      const instance = await createNewBucket();
+      const blockNumber = await web3.eth.getBlockNumber();
+      await expectRevert(
+        instance.setKeyForParticipant(
+          'keyHash',
+          ACCOUNT_0_ADDRESS,
+          blockNumber,
+          { from: ACCOUNT_1_ADDRESS }
+        ),
+        'is missing role'
+      );
     });
 
     it('can not be set if already available', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       const blockNumber = await web3.eth.getBlockNumber();
-      await instance.setKeyForParticipant('keyHash', accounts[0], blockNumber);
+      await instance.setKeyForParticipant(
+        'keyHash',
+        ACCOUNT_0_ADDRESS,
+        blockNumber
+      );
       await expectRevert(
-        instance.setKeyForParticipant('keyHash', accounts[0], blockNumber),
+        instance.setKeyForParticipant(
+          'keyHash',
+          ACCOUNT_0_ADDRESS,
+          blockNumber
+        ),
         'Key already available'
       );
     });
 
     it('can not be set for future blocks', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       const blockNumber = 10000000;
       await expectRevert(
-        instance.setKeyForParticipant('keyHash', accounts[0], blockNumber),
+        instance.setKeyForParticipant(
+          'keyHash',
+          ACCOUNT_0_ADDRESS,
+          blockNumber
+        ),
         'Block time in future.'
       );
     });
@@ -156,54 +233,64 @@ contract('Bucket', (accounts) => {
 
   describe('Creating new elements', () => {
     it('only works for participants', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.createElements([], [], [], [], 0, { from: accounts[1] }),
+        instance.createElements([], [], [], [], 0, { from: ACCOUNT_1_ADDRESS }),
         'is missing role'
       );
     });
 
     it('only works if key is available', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
+      const instance = await createNewBucket();
       await expectRevert(
         instance.createElements([], [], [], [], 0),
         'No key available!'
       );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
+      await instance.createElements(
+        ['meta'],
+        ['data'],
+        ['container'],
+        [constants.ZERO_ADDRESS],
+        0
+      );
     });
 
-    it('decreases limit of participant', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+    it('decreases limit of bucket and not the participant', async () => {
+      const instance = await createNewBucket();
+      const balance = await paymentManager.getLimit.call(instance.address, 0);
+      const balanceSender = await paymentManager.getLimit.call(
+        ACCOUNT_0_ADDRESS,
+        0
       );
-      const balance = await paymentManager.getLimit(instance.address, 0);
-      assert(balance.cmp(new BN(0)) === 0, 'Limit already initialized.');
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      const newBalance = await paymentManager.getLimit(instance.address, 0);
-      assert(balance.cmp(newBalance) === -1, 'Limit was not initialized.');
+      assert(balance.cmp(new BN(0)) !== 0, 'Limit not yet initialized.');
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
+      await instance.createElements(
+        ['meta'],
+        ['data'],
+        ['container'],
+        [constants.ZERO_ADDRESS],
+        0
+      );
+      const newBalance = await paymentManager.getLimit.call(
+        instance.address,
+        0
+      );
+      const newBalanceSender = await paymentManager.getLimit.call(
+        ACCOUNT_0_ADDRESS,
+        0
+      );
       const defaultBalance = await paymentManager.DEFAULT_LIMITS(0);
       assert(defaultBalance.cmp(newBalance) === 1, 'Limit was not decreased.');
+      assert(
+        balanceSender.eq(newBalanceSender),
+        'Limit of sender was changed.'
+      );
     });
 
     it('checks workload', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
+      const instance = await createNewBucket();
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
       await expectRevert(
         instance.createElements(
           [
@@ -270,7 +357,7 @@ contract('Bucket', (accounts) => {
           ],
           ['data'],
           ['container'],
-          [''],
+          [constants.ZERO_ADDRESS],
           0
         ),
         'Workload to high!'
@@ -278,19 +365,15 @@ contract('Bucket', (accounts) => {
     });
 
     it('checks element counts', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
+      const instance = await createNewBucket();
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
 
       await expectRevert(
         instance.createElements(
           ['meta1', 'meta2'],
           ['data1'],
           ['container1'],
-          [''],
+          [constants.ZERO_ADDRESS],
           0
         ),
         'Invalid data hashes length'
@@ -301,7 +384,7 @@ contract('Bucket', (accounts) => {
           ['meta1', 'meta2'],
           ['data1', 'data2'],
           ['container1'],
-          [''],
+          [constants.ZERO_ADDRESS, constants.ZERO_ADDRESS],
           0
         ),
         'Invalid container hashes length'
@@ -312,1194 +395,397 @@ contract('Bucket', (accounts) => {
           ['meta1', 'meta2'],
           ['data1', 'data2'],
           ['container1', 'container2'],
-          [''],
+          [constants.ZERO_ADDRESS],
           0
         ),
-        'Invalid parent hashes length'
+        'Invalid parents length'
       );
     });
 
     it('does not override existing elements', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
+      const instance = await createNewBucket();
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
       await instance.createElements(
         ['metaParent'],
         ['dataParent'],
         ['containerParent'],
-        [''],
+        [constants.ZERO_ADDRESS],
         0
       );
+      const parent = await instance.allElements(0);
       await instance.createElements(
         ['meta'],
         ['data'],
         ['container'],
-        ['containerParent'],
+        [parent],
         0
       );
 
       await expectRevert(
-        instance.createElements(['meta'], ['data'], ['container'], [''], 0),
-        'Element (meta) already exists!'
+        instance.createElements(
+          ['meta'],
+          ['data'],
+          ['container'],
+          [constants.ZERO_ADDRESS],
+          0
+        ),
+        'Meta already exists'
       );
 
       await expectRevert(
-        instance.createElements(['meta2'], ['data'], ['container'], [''], 0),
-        'Element (data) already exists!'
-      );
-
-      await expectRevert(
-        instance.createElements(['meta2'], ['data2'], ['container'], [''], 0),
-        'Element (container) already exists!'
+        instance.createElements(
+          ['meta2'],
+          ['data'],
+          ['container'],
+          [constants.ZERO_ADDRESS],
+          0
+        ),
+        'Data already exists'
       );
 
       await expectRevert(
         instance.createElements(
           ['meta2'],
           ['data2'],
-          ['container2'],
-          ['parent2'],
+          ['container'],
+          [constants.ZERO_ADDRESS],
           0
         ),
-        'Element (parent) not found!'
+        'Container already exists'
       );
     });
 
-    it('adds all elements correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+    it('creates a new element for every input data set', async () => {
+      const instance = await createNewBucket();
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
+      await instance.createElements(
+        ['meta1', 'meta2'],
+        ['data1', 'data2'],
+        ['container1', 'container2'],
+        [constants.ZERO_ADDRESS, constants.ZERO_ADDRESS],
+        0,
+        { from: ACCOUNT_0_ADDRESS }
       );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-
-      const metaExists = await instance.elementExists('meta');
-      assert(metaExists, 'Meta does not exist!');
-      const dataExists = await instance.elementExists('data');
-      assert(dataExists, 'Data does not exist!');
-      const containerExists = await instance.elementExists('container');
-      assert(containerExists, 'Container does not exist!');
-
-      const meta = await instance.allElements(0);
-      assert(meta[0] === 'meta', 'Meta element incorrect (hash)!');
-      assert(meta[1].eq(new BN(0)), 'Meta element incorrect (content)!');
-      assert(meta[2].eq(new BN(0)), 'Meta element incorrect (element)!');
-      assert(meta[3].eq(new BN(0)), 'Meta element incorrect (index)!');
-
-      const data = await instance.allElements(1);
-      assert(data[0] === 'data', 'Data element incorrect (hash)!');
-      assert(data[1].eq(new BN(0)), 'Data element incorrect (content)!');
-      assert(data[2].eq(new BN(1)), 'Data element incorrect (element)!');
-      assert(data[3].eq(new BN(0)), 'Data element incorrect (index)!');
-
-      const container = await instance.allElements(2);
-      assert(
-        container[0] === 'container',
-        'Container element incorrect (hash)!'
-      );
-      assert(
-        container[1].eq(new BN(0)),
-        'Container element incorrect (content)!'
-      );
-      assert(
-        container[2].eq(new BN(2)),
-        'Container element incorrect (element)!'
-      );
-      assert(
-        container[3].eq(new BN(0)),
-        'Container element incorrect (index)!'
-      );
+      const element0 = await instance.allElements(0);
+      const element1 = await instance.allElements(1);
+      await expectRevert(instance.allElements(2), 'revert');
     });
 
-    it('adds data to history correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+    it('adds newly created elements to internal state', async () => {
+      const instance = await createNewBucket();
+      await instance.addKeys(['hash123'], [ACCOUNT_0_ADDRESS]);
+      await instance.createElements(
+        ['meta1', 'meta2'],
+        ['data1', 'data2'],
+        ['container1', 'container2'],
+        [constants.ZERO_ADDRESS, constants.ZERO_ADDRESS],
+        0,
+        { from: ACCOUNT_0_ADDRESS }
       );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
+      const elem1 = await instance.allElements(0);
+      const elem2 = await instance.allElements(1);
 
-      const history = await instance.getHistory();
-      assert(history[0].prevMetaHash === '', 'prevMetaHash incorrect');
-      assert(history[0].prevDataHash === '', 'prevDataHash incorrect');
-      assert(
-        history[0].prevContainerHash === '',
-        'prevContainerHash incorrect'
-      );
-      assert(history[0].newMetaHash === 'meta', 'newMetaHash incorrect');
-      assert(history[0].newDataHash === 'data', 'newDataHash incorrect');
-      assert(
-        history[0].newContainerHash === 'container',
-        'newContainerHash incorrect'
-      );
-      assert(
-        (history[0].operationType as unknown as string) === '0',
-        'operationType incorrect'
-      );
-      assert(
-        history[0].parentContainerHash === '',
-        'parentContainerHash incorrect'
-      );
-    });
+      const hashExistsMeta1 = await instance.hashExists('meta1');
+      assert(hashExistsMeta1, 'Missing hash');
+      const hashExistsMeta2 = await instance.hashExists('meta2');
+      assert(hashExistsMeta2, 'Missing hash');
+      const hashExistsData1 = await instance.hashExists('data1');
+      assert(hashExistsData1, 'Missing hash');
+      const hashExistsData2 = await instance.hashExists('data2');
+      assert(hashExistsData2, 'Missing hash');
+      const hashExistsContainer1 = await instance.hashExists('container1');
+      assert(hashExistsContainer1, 'Missing hash');
+      const hashExistsContainer2 = await instance.hashExists('container2');
+      assert(hashExistsContainer2, 'Missing hash');
 
-    it('adds parent to children relationships', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-
-      const metaParent = await instance.parent('meta');
-      assert(metaParent === 'container', 'metaParent incorrect');
-
-      const dataParent = await instance.parent('data');
-      assert(dataParent === 'container', 'dataParent incorrect');
-
-      const containerChild0 = await instance.children('container', 0);
-      assert(containerChild0 === 'meta', 'containerChild0 incorrect');
-      const containerChild1 = await instance.children('container', 1);
-      assert(containerChild1 === 'data', 'containerChild1 incorrect');
-    });
-
-    it('emits Create event', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      const response = await instance.createElements(
-        ['meta'],
-        ['data'],
-        ['container'],
-        [''],
-        0
-      );
-
-      assert(response.logs.some((log) => log.event === 'Create'));
+      const history1 = await instance.history(0);
+      assert(history1[0] == elem1, 'Wrong address');
+      assert(history1[1].eq(new BN(0)), 'Wrong operation');
+      const history2 = await instance.history(0);
+      assert(history2[1].eq(new BN(0)), 'Wrong operation');
     });
   });
 
-  describe('Updating elements', () => {
-    it('only works for participants', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+  describe('Redeeming participation code', () => {
+    it('works as expected', async () => {
+      const instance = await createNewBucket();
+      const payload = await getParticipationCodePayload();
+      await instance.redeemParticipationCode(
+        'Paul',
+        payload.inviter,
+        payload.signature,
+        payload.randomCode,
+        ACCOUNT_1_PUBLIC_KEY,
+        { value: new BN(1000000000000000), from: ACCOUNT_1_ADDRESS }
       );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
+      const participantManagerAddress = await instance.participantManager();
+      const participantManager = await ParticipantManager.at(
+        participantManagerAddress
+      );
+      const count = await participantManager.participantCount();
+      assert(count.eq(new BN(2)), 'Wrong participant count!');
+    });
+  });
+
+  describe('Removing participation', () => {
+    it('only works for participants', async () => {
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0,
-          { from: accounts[1] }
-        ),
+        instance.removeParticipation({ from: ACCOUNT_1_ADDRESS }),
         'is missing role'
       );
     });
 
-    it('only works if key is available', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      const receipt = await instance.createElements(
-        ['meta'],
-        ['data'],
-        ['container'],
-        [''],
-        0
-      );
-      const blockNumberNew = (
-        new BN(receipt.receipt.blockNumber) as BN
-      ).toNumber();
-      await time.advanceBlockTo(blockNumberNew + 100);
-
+    it('only works if participant is left', async () => {
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'No key available'
+        instance.removeParticipation({ from: ACCOUNT_0_ADDRESS }),
+        'Last participant'
       );
     });
 
-    it('decreases limit of participant', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+    it('removes the sender as participant', async () => {
+      const instance = await createNewBucket();
+      const payload = await getParticipationCodePayload();
+      await instance.redeemParticipationCode(
+        'Paul',
+        payload.inviter,
+        payload.signature,
+        payload.randomCode,
+        ACCOUNT_1_PUBLIC_KEY,
+        { value: new BN(1000000000000000), from: ACCOUNT_1_ADDRESS }
       );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-
-      const balance = await paymentManager.getLimit(instance.address, 0);
-      await instance.updateElements(
-        ['meta'],
-        ['newMeta'],
-        ['data'],
-        ['newData'],
-        ['container'],
-        ['newContainer'],
-        [''],
-        0
-      );
-      const newBalance = await paymentManager.getLimit(instance.address, 0);
-
-      assert(balance.cmp(newBalance) === 1, 'Limit was not decreased.');
-    });
-
-    it('checks workload', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await expectRevert(
-        instance.updateElements(
-          [
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-          ],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Workload to high!'
-      );
-    });
-
-    it('checks element counts', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta1', 'newMeta2'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Invalid new meta hashes length!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data1', 'data2'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Invalid prev data hashes length!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData1', 'newData2'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Invalid new data hashes length!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container1', 'container2'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Invalid prev container hashes length!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer1', 'newContainer2'],
-          [''],
-          0
-        ),
-        'Invalid new container hashes length!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer1'],
-          ['parent1', 'parent2'],
-          0
-        ),
-        'Invalid parent hashes length!'
-      );
-    });
-
-    it('checks existance of elements to update', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-
-      await expectRevert(
-        instance.updateElements(
-          ['previousMeta'],
-          ['newMeta'],
-          ['previousData'],
-          ['newData'],
-          ['previousContainer'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Element (meta) not found!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['previousData'],
-          ['newData'],
-          ['previousContainer'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Element (data) not found!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['previousContainer'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Element (container) not found!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          ['parent'],
-          0
-        ),
-        'Element (parent) not found!'
-      );
-    });
-
-    it('checks versions of elements to update', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.createElements(
-        ['meta2'],
-        ['data2'],
-        ['container2'],
-        [''],
-        0
-      );
-      await instance.updateElements(
-        ['meta'],
-        ['newMeta'],
-        ['data'],
-        ['newData'],
-        ['container'],
-        ['newContainer'],
-        [''],
-        0
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Old version already has an update!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['newMeta'],
-          ['newMeta2'],
-          ['data'],
-          ['newData'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Old version already has an update!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['newMeta'],
-          ['newMeta2'],
-          ['newData'],
-          ['newData2'],
-          ['container'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Old version already has an update!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta2'],
-          ['newMeta'],
-          ['data2'],
-          ['newData'],
-          ['container2'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'New version already has an older version!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta2'],
-          ['newMeta2'],
-          ['data2'],
-          ['newData'],
-          ['container2'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'New version already has an older version!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta2'],
-          ['newMeta2'],
-          ['data2'],
-          ['newData2'],
-          ['container2'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'New version already has an older version!'
-      );
-    });
-
-    it('checks parent relationship of elements to update', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.createElements(
-        ['meta1'],
-        ['data1'],
-        ['container1'],
-        [''],
-        0
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container1'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Element (meta) is not child of container1!'
-      );
-
-      await expectRevert(
-        instance.updateElements(
-          ['meta1'],
-          ['newMeta'],
-          ['data'],
-          ['newData'],
-          ['container1'],
-          ['newContainer'],
-          [''],
-          0
-        ),
-        'Element (data) is not child of container1!'
-      );
-    });
-
-    it('only creates new elements for updates if they do not exist', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['meta'],
-        ['data'],
-        ['data'],
-        ['container'],
-        ['container'],
-        [''],
-        0
-      );
-      let allElements = await instance.getAll();
-      assert(allElements.length === 3, 'Wrong element count (3)!');
-      assert(
-        allElements.filter((elem) => elem.hash === 'meta').length === 1,
-        'Too many meta elements!'
-      );
-      assert(
-        allElements.filter((elem) => elem.hash === 'data').length === 1,
-        'Too many data elements!'
-      );
-      assert(
-        allElements.filter((elem) => elem.hash === 'container').length === 1,
-        'Too many container elements!'
-      );
-
-      await instance.updateElements(
-        ['meta'],
-        ['newMeta2'],
-        ['data'],
-        ['newData2'],
-        ['container'],
-        ['newContainer2'],
-        [''],
-        0
-      );
-      allElements = await instance.getAll();
-      assert(allElements.length === 6, 'Wrong element count (6)!');
-    });
-
-    it('adds all elements correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['meta2'],
-        ['data'],
-        ['data2'],
-        ['container'],
-        ['container2'],
-        [''],
-        0
-      );
-
-      const metaExists = await instance.elementExists('meta');
-      assert(metaExists, 'Meta does not exist!');
-      const dataExists = await instance.elementExists('data');
-      assert(dataExists, 'Data does not exist!');
-      const containerExists = await instance.elementExists('container');
-      assert(containerExists, 'Container does not exist!');
-      const meta2Exists = await instance.elementExists('meta2');
-      assert(meta2Exists, 'Meta2 does not exist!');
-      const data2Exists = await instance.elementExists('data2');
-      assert(data2Exists, 'Data2 does not exist!');
-      const container2Exists = await instance.elementExists('container2');
-      assert(container2Exists, 'Container2 does not exist!');
-
-      const meta = await instance.allElements(0);
-      assert(meta[0] === 'meta', 'Meta element incorrect (hash)!');
-      assert(meta[1].eq(new BN(0)), 'Meta element incorrect (content)!');
-      assert(meta[2].eq(new BN(0)), 'Meta element incorrect (element)!');
-      assert(meta[3].eq(new BN(0)), 'Meta element incorrect (index)!');
-
-      const data = await instance.allElements(1);
-      assert(data[0] === 'data', 'Data element incorrect (hash)!');
-      assert(data[1].eq(new BN(0)), 'Data element incorrect (content)!');
-      assert(data[2].eq(new BN(1)), 'Data element incorrect (element)!');
-      assert(data[3].eq(new BN(0)), 'Data element incorrect (index)!');
-
-      const container = await instance.allElements(2);
-      assert(
-        container[0] === 'container',
-        'Container element incorrect (hash)!'
-      );
-      assert(
-        container[1].eq(new BN(0)),
-        'Container element incorrect (content)!'
-      );
-      assert(
-        container[2].eq(new BN(2)),
-        'Container element incorrect (element)!'
-      );
-      assert(
-        container[3].eq(new BN(0)),
-        'Container element incorrect (index)!'
-      );
-
-      const meta2 = await instance.allElements(0);
-      assert(meta2[0] === 'meta', 'Meta element incorrect (hash)!');
-      assert(meta2[1].eq(new BN(0)), 'Meta element incorrect (content)!');
-      assert(meta2[2].eq(new BN(0)), 'Meta element incorrect (element)!');
-      assert(meta2[3].eq(new BN(0)), 'Meta element incorrect (index)!');
-
-      const data2 = await instance.allElements(1);
-      assert(data2[0] === 'data', 'Data element incorrect (hash)!');
-      assert(data2[1].eq(new BN(0)), 'Data element incorrect (content)!');
-      assert(data2[2].eq(new BN(1)), 'Data element incorrect (element)!');
-      assert(data2[3].eq(new BN(0)), 'Data element incorrect (index)!');
-
-      const container2 = await instance.allElements(2);
-      assert(
-        container2[0] === 'container',
-        'Container element incorrect (hash)!'
-      );
-      assert(
-        container2[1].eq(new BN(0)),
-        'Container element incorrect (content)!'
-      );
-      assert(
-        container2[2].eq(new BN(2)),
-        'Container element incorrect (element)!'
-      );
-      assert(
-        container2[3].eq(new BN(0)),
-        'Container element incorrect (index)!'
-      );
-    });
-
-    it('adds data to history correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['meta2'],
-        ['data'],
-        ['data2'],
-        ['container'],
-        ['container2'],
-        [''],
-        0
-      );
-
-      const history = await instance.getHistory();
-      assert(history.length === 2, 'history length incorrect');
-      assert(history[1].prevMetaHash === 'meta', 'prevMetaHash incorrect');
-      assert(history[1].prevDataHash === 'data', 'prevDataHash incorrect');
-      assert(
-        history[1].prevContainerHash === 'container',
-        'prevContainerHash incorrect'
-      );
-      assert(history[1].newMetaHash === 'meta2', 'newMetaHash incorrect');
-      assert(history[1].newDataHash === 'data2', 'newDataHash incorrect');
-      assert(
-        history[1].newContainerHash === 'container2',
-        'newContainerHash incorrect'
-      );
-      assert(
-        (history[1].operationType as unknown as string) === '1',
-        'operationType incorrect'
-      );
-      assert(
-        history[1].parentContainerHash === '',
-        'parentContainerHash incorrect'
-      );
-    });
-
-    it('adds parent to children relationships', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['meta2'],
-        ['data'],
-        ['data2'],
-        ['container'],
-        ['container2'],
-        [''],
-        0
-      );
-
-      const metaParent = await instance.parent('meta2');
-      assert(metaParent === 'container2', 'metaParent incorrect');
-
-      const dataParent = await instance.parent('data2');
-      assert(dataParent === 'container2', 'dataParent incorrect');
-
-      const containerChild0 = await instance.children('container2', 0);
-      assert(containerChild0 === 'meta2', 'containerChild0 incorrect');
-      const containerChild1 = await instance.children('container2', 1);
-      assert(containerChild1 === 'data2', 'containerChild1 incorrect');
-    });
-
-    it('adds versioning correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['meta2'],
-        ['data'],
-        ['data2'],
-        ['container'],
-        ['container2'],
-        [''],
-        0
-      );
-
-      const metaNewVersion = await instance.oldToNewVersions('meta');
-      const dataNewVersion = await instance.oldToNewVersions('data');
-      const containerNewVersion = await instance.oldToNewVersions('container');
-
-      assert(metaNewVersion === 'meta2', 'New version of meta hash incorrect.');
-      assert(dataNewVersion === 'data2', 'New version of data hash incorrect.');
-      assert(
-        containerNewVersion === 'container2',
-        'New version of container hash incorrect.'
-      );
-    });
-
-    it('emits Update event', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      const response = await instance.updateElements(
-        ['meta'],
-        ['meta2'],
-        ['data'],
-        ['data2'],
-        ['container'],
-        ['container2'],
-        [''],
-        0
-      );
-
-      assert(response.logs.some((log) => log.event === 'Update'));
+      await instance.removeParticipation({ from: ACCOUNT_1_ADDRESS });
     });
   });
 
-  describe('Removing elements', () => {
-    it('only works for participants', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
+  describe('Notifiying about a creation', () => {
+    it('only works for registered elements', async () => {
+      const instance = await createNewBucket();
       await expectRevert(
-        instance.removeElements(['meta'], ['data'], ['container'], {
-          from: accounts[1],
+        instance.notifyCreation(ACCOUNT_0_ADDRESS),
+        'Only callable from registered element!'
+      );
+    });
+
+    it('adds element to history', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      await instance.notifyCreation(ACCOUNT_0_ADDRESS);
+      const history = await instance.history(0);
+      assert(history[0] == ACCOUNT_0_ADDRESS, 'Wrong element address');
+      assert(history[1].eq(new BN(0)), 'Wrong operation type');
+    });
+
+    it('emits event', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      const receipt = await instance.notifyCreation(ACCOUNT_0_ADDRESS);
+
+      expectEvent(receipt, 'Create', {
+        _elem: ACCOUNT_0_ADDRESS,
+        // _blockNumber: receipt.logs,
+        _sender: ACCOUNT_0_ADDRESS,
+      });
+    });
+  });
+
+  describe('Pre-registering and element', () => {
+    it('only works for registered elements', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.preRegisterElement(ACCOUNT_0_ADDRESS),
+        'Only callable from registered element!'
+      );
+    });
+
+    it('pre-registers successfully', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      await instance.preRegisterElement(ACCOUNT_0_ADDRESS);
+    });
+  });
+
+  describe('Notifiying about an update', () => {
+    it('only works for registered elements', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS),
+        'Only callable from registered element!'
+      );
+    });
+
+    it('adds element to history', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      await instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS);
+      const history = await instance.history(0);
+      assert(history[0] == ACCOUNT_0_ADDRESS, 'Wrong element address');
+      assert(history[1].eq(new BN(1)), 'Wrong operation type');
+    });
+
+    it('emits event', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      const receipt = await instance.notifyUpdate(
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_ADDRESS
+      );
+      expectEvent(receipt, 'Update', {
+        _prevElem: ACCOUNT_0_ADDRESS,
+        // _blockNumber: receipt.logs,
+        _newElemt: ACCOUNT_0_ADDRESS,
+        _sender: ACCOUNT_0_ADDRESS,
+      });
+    });
+
+    it('checks key availability', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      await expectRevert(
+        instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS),
+        'No key available!'
+      );
+    });
+
+    it('decreases limit of bucket', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      const limitBefore = await paymentManager.DEFAULT_LIMITS(0);
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      await instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS);
+      const limitAfter = await paymentManager.getLimit.call(
+        instance.address,
+        0
+      );
+      assert(limitAfter.lt(limitBefore), 'Limit was not decreased.');
+    });
+  });
+
+  describe('Notifiying about a parent update', () => {
+    it('only works for registered elements', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.notifyUpdateParent(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS),
+        'Only callable from registered element!'
+      );
+    });
+
+    it('adds element to history', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      const elem = await Element.new();
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      await instance.notifyUpdateParent(elem.address, ACCOUNT_0_ADDRESS);
+      const history = await instance.history(0);
+      assert(history[0] == elem.address, 'Wrong element address');
+      assert(history[1].eq(new BN(2)), 'Wrong operation type');
+    });
+
+    it('emits event', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      const elem = await Element.new();
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      const receipt = await instance.notifyUpdateParent(
+        elem.address,
+        ACCOUNT_0_ADDRESS
+      );
+      expectEvent(receipt, 'UpdateParent', {
+        _elem: elem.address,
+        // _blockNumber: receipt.logs,
+        _parent: constants.ZERO_ADDRESS,
+        _sender: ACCOUNT_0_ADDRESS,
+      });
+    });
+  });
+
+  describe('Notifiying about a deletion', () => {
+    it('only works for registered elements', async () => {
+      const instance = await createNewBucket();
+      await expectRevert(
+        instance.notifyDelete(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS),
+        'Only callable from registered element!'
+      );
+    });
+
+    it('emits event', async () => {
+      const instance = await createNewBucket(true);
+      await (instance as BucketMockInstance).mockRegisterElement(
+        ACCOUNT_0_ADDRESS
+      );
+      const elem = await Element.new();
+      await instance.addKeys(['key123'], [ACCOUNT_0_ADDRESS]);
+      const receipt = await instance.notifyDelete(
+        elem.address,
+        ACCOUNT_0_ADDRESS
+      );
+      expectEvent(receipt, 'Delete', {
+        _elem: elem.address,
+        _sender: ACCOUNT_0_ADDRESS,
+      });
+    });
+  });
+
+  describe('Setting the element implementation', () => {
+    it('only works for owner', async () => {
+      const instance = await createNewBucket();
+      const elem = await Element.new();
+      await expectRevert(
+        instance.setElementImplementation(elem.address, {
+          from: ACCOUNT_1_ADDRESS,
         }),
         'is missing role'
       );
     });
 
-    it('checks workload', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
+    it('works as expected', async () => {
+      const instance = await createNewBucket();
+      const elem = await Element.new();
+      await instance.setElementImplementation(elem.address);
+      const address = await instance.elementImpl();
+      assert(address == elem.address, 'Wrong element implementation set.');
+    });
+  });
+
+  describe('Updating the minimal redundancy', () => {
+    it('only works for participants', async () => {
+      const instance = await createNewBucket();
+      const elem = await Element.new();
       await expectRevert(
-        instance.removeElements(
-          [
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-            'meta',
-          ],
-          ['data'],
-          ['container']
-        ),
-        'Workload to high!'
+        instance.setMinElementRedundancy(0, {
+          from: ACCOUNT_1_ADDRESS,
+        }),
+        'is missing role'
       );
     });
 
-    it('checks existance of elements to delete', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-
-      await expectRevert(
-        instance.removeElements(['meta2'], ['data'], ['container']),
-        'Element (meta) not found!'
-      );
-
-      await expectRevert(
-        instance.removeElements(['meta'], ['data2'], ['container']),
-        'Element (data) not found!'
-      );
-
-      await expectRevert(
-        instance.removeElements(['meta'], ['data'], ['container2']),
-        'Element (container) not found!'
-      );
-    });
-
-    it('checks existance of elements to delete', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.updateElements(
-        ['meta'],
-        ['newMeta'],
-        ['data'],
-        ['newData'],
-        ['container'],
-        ['newContainer'],
-        [''],
-        0
-      );
-
-      await expectRevert(
-        instance.removeElements(['meta'], ['newData'], ['newContainer']),
-        'Newer (meta) version exists!'
-      );
-
-      await expectRevert(
-        instance.removeElements(['newMeta'], ['data'], ['newContainer']),
-        'Newer (data) version exists!'
-      );
-
-      await expectRevert(
-        instance.removeElements(['newMeta'], ['newData'], ['container']),
-        'Newer (container) version exists!'
-      );
-    });
-
-    it('checks parent relationship of elements to update', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.createElements(
-        ['meta1'],
-        ['data1'],
-        ['container1'],
-        [''],
-        0
-      );
-
-      await expectRevert(
-        instance.removeElements(['meta'], ['data1'], ['container1']),
-        'Element (meta) is not child of container1!'
-      );
-
-      await expectRevert(
-        instance.removeElements(['meta'], ['data1'], ['container']),
-        'Element (data) is not child of container!'
-      );
-    });
-
-    it('updates versioning to ZERO_HASH for all elements to update', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.removeElements(['meta'], ['data'], ['container']);
-
-      const zeroHash = await instance.ZERO_HASH();
-
-      const metaNewVersion = await instance.oldToNewVersions('meta');
-      const dataNewVersion = await instance.oldToNewVersions('data');
-      const containerNewVersion = await instance.oldToNewVersions('container');
-
-      assert(
-        metaNewVersion === zeroHash,
-        'New version of meta hash incorrect.'
-      );
-      assert(
-        dataNewVersion === zeroHash,
-        'New version of data hash incorrect.'
-      );
-      assert(
-        containerNewVersion === zeroHash,
-        'New version of container hash incorrect.'
-      );
-    });
-
-    it('adds data to history correctly', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      await instance.removeElements(['meta'], ['data'], ['container']);
-      const zeroHash = await instance.ZERO_HASH();
-
-      const history = await instance.getHistory();
-      assert(history.length === 2, 'history length incorrect');
-      assert(history[1].prevMetaHash === 'meta', 'prevMetaHash incorrect');
-      assert(history[1].prevDataHash === 'data', 'prevDataHash incorrect');
-      assert(
-        history[1].prevContainerHash === 'container',
-        'prevContainerHash incorrect'
-      );
-      assert(history[1].newMetaHash === zeroHash, 'newMetaHash incorrect');
-      assert(history[1].newDataHash === zeroHash, 'newDataHash incorrect');
-      assert(
-        history[1].newContainerHash === zeroHash,
-        'newContainerHash incorrect'
-      );
-      assert(
-        (history[1].operationType as unknown as string) === '2',
-        'operationType incorrect'
-      );
-      assert(
-        history[1].parentContainerHash === '',
-        'parentContainerHash incorrect'
-      );
-    });
-
-    it('emits Delete event', async () => {
-      const instance = await Bucket.new(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
-      );
-      await instance.addKeys(['hash123'], [accounts[0]]);
-      await instance.createElements(['meta'], ['data'], ['container'], [''], 0);
-      const response = await instance.removeElements(
-        ['meta'],
-        ['data'],
-        ['container']
-      );
-
-      assert(response.logs.some((log) => log.event === 'Delete'));
+    it('works as expected', async () => {
+      const instance = await createNewBucket();
+      const elem = await Element.new();
+      await instance.setMinElementRedundancy(2);
+      const redundancy = await instance.minElementRedundancy();
+      assert(redundancy.eq(new BN(2)), 'Wrong redundancy level set.');
     });
   });
 });

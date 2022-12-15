@@ -1,46 +1,131 @@
+import { getAccountKeys } from '../keys.helper';
+
 const {
-  BN, // Big Number support
   expectRevert, // Assertions for transactions that should fail
+  constants,
 } = require('@openzeppelin/test-helpers');
 
-const InvitationChecker = artifacts.require('InvitationChecker');
-const PubKeyChecker = artifacts.require('PubKeyChecker');
-const PaymentManager = artifacts.require('PaymentManager');
 const BucketFactory = artifacts.require('BucketFactory');
-const ParticipantManager = artifacts.require('ParticipantManager');
-const CreditChecker = artifacts.require('CreditChecker');
+const Bucket = artifacts.require('Bucket');
+const Element = artifacts.require('Element');
 
-contract('BucketFactory', (accounts) => {
+const { ACCOUNT_0_ADDRESS, ACCOUNT_0_PUBLIC_KEY, ACCOUNT_1_ADDRESS } =
+  getAccountKeys();
+
+contract('BucketFactory', () => {
   describe('Creating new Buckets', () => {
-    it('works as expected', async () => {
-      const creditChecker = await CreditChecker.new();
-      PaymentManager.link('CreditChecker', creditChecker.address);
-
-      const invitationChecker = await InvitationChecker.new();
-      const pubKeyChecker = await PubKeyChecker.new();
-      const bucketFactory = await BucketFactory.new();
-
-      ParticipantManager.link('InvitationChecker', invitationChecker.address);
-      ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
-      const pubKey =
-        '0x68cb0cffc92a03959e6fdc99a24f8c94143050099ca104863528c25e3c024f61a7049e09e669397f43d0fd63432b5b358f3d0caaf03b34acbcdc7f2cbe227db9';
-      const participantManager = await ParticipantManager.new(
-        'name',
-        '0x5B38Da6a701c568545dCfcB03FcB875f56beddC4',
-        pubKey,
-        paymentManager.address
+    it('fails if no registered space', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
       );
-
-      await bucketFactory.createBucket(
-        paymentManager.address,
-        participantManager.address,
-        { value: new BN(1000000000000000) }
+      await expectRevert(
+        bucketFactory.createBucket(
+          constants.ZERO_ADDRESS,
+          'Peter Parker',
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_0_PUBLIC_KEY
+        ),
+        'Only registered spaces allowed!'
       );
     });
 
-    // TODO: Test space registering
+    it('works for registered space', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await bucketFactory.registerSpace(ACCOUNT_0_ADDRESS);
+      await bucketFactory.createBucket(
+        constants.ZERO_ADDRESS,
+        'Peter Parker',
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY
+      );
+    });
+  });
+
+  describe('Registering space new Buckets', () => {
+    it('works for owner', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await bucketFactory.registerSpace(ACCOUNT_0_ADDRESS);
+    });
+
+    it('fails if not owner', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await expectRevert(
+        bucketFactory.registerSpace(ACCOUNT_1_ADDRESS, {
+          from: ACCOUNT_1_ADDRESS,
+        }),
+        'caller is not the owner'
+      );
+    });
+  });
+
+  describe('Setting implementation', () => {
+    it('works as expected for elements', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await bucketFactory.setElementImplementation(ACCOUNT_0_ADDRESS);
+    });
+
+    it('only works for owner', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await expectRevert(
+        bucketFactory.setElementImplementation(ACCOUNT_1_ADDRESS, {
+          from: ACCOUNT_1_ADDRESS,
+        }),
+        'caller is not the owner'
+      );
+    });
+
+    it('works as expected for buckets', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await bucketFactory.setBucketImplementation(ACCOUNT_0_ADDRESS);
+    });
+
+    it('only works for owner', async () => {
+      const bucket = await Bucket.new();
+      const element = await Element.new();
+      const bucketFactory = await BucketFactory.new(
+        bucket.address,
+        element.address
+      );
+      await expectRevert(
+        bucketFactory.setBucketImplementation(ACCOUNT_1_ADDRESS, {
+          from: ACCOUNT_1_ADDRESS,
+        }),
+        'caller is not the owner'
+      );
+    });
   });
 });
 

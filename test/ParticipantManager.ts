@@ -1,25 +1,29 @@
 import Web3 from 'web3';
-import {
-  ParticipantManagerContract,
-  ParticipantManagerInstance,
-} from '../types/truffle-contracts';
-const {
-  BN, // Big Number support
-  constants, // Common constants, like the zero address and largest integers
-  expectEvent, // Assertions for emitted events
-  expectRevert, // Assertions for transactions that should fail
-} = require('@openzeppelin/test-helpers');
+import { ParticipantManagerInstance } from '../types/truffle-contracts';
+const { constants, expectRevert } = require('@openzeppelin/test-helpers');
+import { getAccountKeys } from './keys.helper';
 
 const ParticipantManager = artifacts.require('ParticipantManager');
 const PubKeyChecker = artifacts.require('PubKeyChecker');
+const CreditChecker = artifacts.require('CreditChecker');
 const InvitationChecker = artifacts.require('InvitationChecker');
 const PaymentManager = artifacts.require('PaymentManager');
 
-contract('ParticipantManager', (accounts) => {
+const {
+  ACCOUNT_0_PRIVATE_KEY,
+  ACCOUNT_0_PUBLIC_KEY,
+  ACCOUNT_0_ADDRESS,
+  ACCOUNT_1_PUBLIC_KEY,
+  ACCOUNT_1_ADDRESS,
+  ACCOUNT_2_PUBLIC_KEY,
+  ACCOUNT_2_ADDRESS,
+} = getAccountKeys();
+
+contract('ParticipantManager', () => {
   const adminRoleHash =
     '0x0000000000000000000000000000000000000000000000000000000000000000';
   const participantRoleHash = Web3.utils.keccak256('PARTICIPANT');
-  const editorRoleHash = Web3.utils.keccak256('UPDATEOR');
+  const updaterRoleHash = Web3.utils.keccak256('UPDATER');
   const managerRoleHash = Web3.utils.keccak256('MANAGER');
   const ownerRoleHash = Web3.utils.keccak256('OWNER');
 
@@ -29,37 +33,40 @@ contract('ParticipantManager', (accounts) => {
     before(async () => {
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
+      const creditChecker = await CreditChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const adr = '0x5B38Da6a701c568545dCfcB03FcB875f56beddC4';
-      const pubKey =
-        '0x68cb0cffc92a03959e6fdc99a24f8c94143050099ca104863528c25e3c024f61a7049e09e669397f43d0fd63432b5b358f3d0caaf03b34acbcdc7f2cbe227db9';
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       instance = await ParticipantManager.new(
         'Peter Parker',
-        adr,
-        pubKey,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
         paymentManager.address
       );
     });
 
     it('PARTICIPANT_ROLE', async () => {
-      const roleHash = await instance.PARTICIPANT_ROLE();
+      const roleHash = await instance.ALL_ROLES(0);
       assert.equal(participantRoleHash, roleHash);
     });
 
-    it('UPDATEOR_ROLE', async () => {
-      const roleHash = await instance.UPDATEOR_ROLE();
-      assert.equal(editorRoleHash, roleHash);
+    it('UPDATER_ROLE', async () => {
+      const roleHash = await instance.ALL_ROLES(1);
+      assert.equal(updaterRoleHash, roleHash);
     });
 
     it('MANAGER_ROLE', async () => {
-      const roleHash = await instance.MANAGER_ROLE();
+      const roleHash = await instance.ALL_ROLES(2);
       assert.equal(managerRoleHash, roleHash);
     });
 
     it('OWNER_ROLE', async () => {
-      const roleHash = await instance.OWNER_ROLE();
+      const roleHash = await instance.ALL_ROLES(3);
       assert.equal(ownerRoleHash, roleHash);
     });
 
@@ -71,99 +78,114 @@ contract('ParticipantManager', (accounts) => {
 
   describe('After deployment', () => {
     let instance: ParticipantManagerInstance;
-    const adr = '0x5B38Da6a701c568545dCfcB03FcB875f56beddC4';
-    const pubKey =
-      '0x68cb0cffc92a03959e6fdc99a24f8c94143050099ca104863528c25e3c024f61a7049e09e669397f43d0fd63432b5b358f3d0caaf03b34acbcdc7f2cbe227db9';
 
     before(async () => {
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       instance = await ParticipantManager.new(
         'Peter Parker',
-        adr,
-        pubKey,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
         paymentManager.address
       );
     });
 
     it('deployer has DEFAULT_ADMIN_ROLE', async () => {
-      const hasRole = await instance.hasRole(adminRoleHash, adr);
+      const hasRole = await instance.hasRole(adminRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, true);
     });
 
     it('deployer has PARTICIPANT_ROLE', async () => {
-      const hasRole = await instance.hasRole(participantRoleHash, adr);
+      const hasRole = await instance.hasRole(
+        participantRoleHash,
+        ACCOUNT_0_ADDRESS
+      );
       assert.equal(hasRole, true);
     });
 
-    it('deployer has UPDATEOR_ROLE', async () => {
-      const hasRole = await instance.hasRole(editorRoleHash, adr);
+    it('deployer has UPDATER_ROLE', async () => {
+      const hasRole = await instance.hasRole(
+        updaterRoleHash,
+        ACCOUNT_0_ADDRESS
+      );
       assert.equal(hasRole, true);
     });
 
     it('deployer has MANAGER_ROLE', async () => {
-      const hasRole = await instance.hasRole(managerRoleHash, adr);
+      const hasRole = await instance.hasRole(
+        managerRoleHash,
+        ACCOUNT_0_ADDRESS
+      );
       assert.equal(hasRole, true);
     });
 
     it('deployer has OWNER_ROLE', async () => {
-      const hasRole = await instance.hasRole(ownerRoleHash, adr);
+      const hasRole = await instance.hasRole(ownerRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, true);
     });
 
     it("deployer's address is saved", async () => {
       const deployer = await instance.allParticipantAddresses(0);
-      assert.equal(deployer, adr);
+      assert.equal(deployer, ACCOUNT_0_ADDRESS);
     });
 
     it("deployer's data is valid", async () => {
-      const participant = await instance.allParticipants(adr);
-      assert.equal(participant[0], adr);
+      const participant = await instance.allParticipants(ACCOUNT_0_ADDRESS);
+      assert.equal(participant[0], ACCOUNT_0_ADDRESS);
       assert.equal(participant[1], 'Peter Parker');
-      assert.equal(participant[2], pubKey);
+      assert.equal(participant[2], ACCOUNT_0_PUBLIC_KEY);
       assert.equal(participant[3], true);
     });
   });
 
   describe('Removing participation', () => {
     let instance: ParticipantManagerInstance;
-    const pubKey =
-      '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
 
     beforeEach(async () => {
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       instance = await ParticipantManager.new(
         'Peter Parker',
-        accounts[0],
-        pubKey,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
         paymentManager.address
       );
     });
 
     it('removes all roles for participant', async () => {
-      await instance.removeParticipation();
-      let hasRole = await instance.hasRole(participantRoleHash, accounts[0]);
+      await instance.removeParticipation(ACCOUNT_0_ADDRESS);
+      let hasRole = await instance.hasRole(
+        participantRoleHash,
+        ACCOUNT_0_ADDRESS
+      );
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(editorRoleHash, accounts[0]);
+      hasRole = await instance.hasRole(updaterRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(managerRoleHash, accounts[0]);
+      hasRole = await instance.hasRole(managerRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(adminRoleHash, accounts[0]);
+      hasRole = await instance.hasRole(adminRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, true);
-      hasRole = await instance.hasRole(ownerRoleHash, accounts[0]);
+      hasRole = await instance.hasRole(ownerRoleHash, ACCOUNT_0_ADDRESS);
       assert.equal(hasRole, false);
     });
 
     it('removes participant from all participants', async () => {
-      await instance.removeParticipation();
-      const result = await instance.allParticipants(accounts[0]);
+      await instance.removeParticipation(ACCOUNT_0_ADDRESS);
+      const result = await instance.allParticipants(ACCOUNT_0_ADDRESS);
       assert.equal(result[0], constants.ZERO_ADDRESS);
       assert.equal(result[1], '');
       assert.equal(result[2], null);
@@ -171,230 +193,301 @@ contract('ParticipantManager', (accounts) => {
     });
 
     it('emits RemoveOwner event', async () => {
-      const response = await instance.removeParticipation();
+      const response = await instance.removeParticipation(ACCOUNT_0_ADDRESS);
       assert(response.logs.some((log) => log.event === 'RemoveParticipant'));
     });
   });
 
   describe('Redeeming participation code', () => {
-    it('fails for insufficient fee', async () => {
-      const pManager = await PaymentManager.new(1000, 1000);
-      await web3.eth.accounts.wallet.create(1);
-      const newAccount = web3.eth.accounts.wallet[0];
-      const randomCode = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(randomCode) ?? '';
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        newAccount.privateKey
-      );
-
-      const pubKey =
-        '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
-      const invitationChecker = await InvitationChecker.new();
-      const pubKeyChecker = await PubKeyChecker.new();
-      ParticipantManager.link('InvitationChecker', invitationChecker.address);
-      ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
-      const instance = await ParticipantManager.new(
-        'Peter Parker',
-        accounts[0],
-        pubKey,
-        paymentManager.address
-      );
-
-      await expectRevert(
-        instance.redeemParticipationCode(
-          'Paul',
-          newAccount.address,
-          signResult.signature,
-          randomCode,
-          pubKey,
-          { from: accounts[1], value: new BN('1000') }
-        ),
-        'Insufficient fee'
-      );
-    });
-
     it('only works if inviter is manager', async () => {
-      await web3.eth.accounts.wallet.create(1);
-      const newAccount = web3.eth.accounts.wallet[0];
       const randomCode = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(randomCode) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
       const signResult = await web3.eth.accounts.sign(
         hash,
-        newAccount.privateKey
+        ACCOUNT_0_PRIVATE_KEY
       );
 
-      const pubKey =
-        '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       const instance = await ParticipantManager.new(
         'Peter Parker',
-        accounts[0],
-        pubKey,
-        paymentManager.address
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
       );
+
+      await instance.renounceRole(managerRoleHash, ACCOUNT_0_ADDRESS);
 
       await expectRevert(
         instance.redeemParticipationCode(
           'Paul',
-          newAccount.address,
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_1_ADDRESS,
           signResult.signature,
           randomCode,
-          pubKey,
-          { from: accounts[1], value: new BN('1000000000000000') }
+          ACCOUNT_1_PUBLIC_KEY,
+          { from: ACCOUNT_0_ADDRESS }
         ),
         'Forbidden'
       );
     });
 
-    it('works as expected', async () => {
-      const privateKey =
-        '0x6f8074f4d89c4adc637b1afe3f11a14e38953b2df56527a6958ad4bc2a0e411d';
-      const publicKey =
-        '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
-      const address = '0x2BdfC992E37C821BB383613eb5C8134340619C91';
-
+    it('only works if sender is admin', async () => {
       const randomCode = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(randomCode) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(hash, privateKey);
+      const signResult = await web3.eth.accounts.sign(
+        hash,
+        ACCOUNT_0_PRIVATE_KEY
+      );
 
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       const instance = await ParticipantManager.new(
         'Peter Parker',
-        address,
-        publicKey,
-        paymentManager.address
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
-      const account1PubKey =
-        '0x8772cef469cc91f80ff85df297b02eee52fe66d3b40e0a3959cf406f77d6277f20e9dec05e12fd36dc5622bfaca5dfa6331452eddcd78a6c01fdce5053c29f13';
+      await instance.renounceRole(adminRoleHash, ACCOUNT_0_ADDRESS);
+
+      await expectRevert(
+        instance.redeemParticipationCode(
+          'Paul',
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_1_ADDRESS,
+          signResult.signature,
+          randomCode,
+          ACCOUNT_1_PUBLIC_KEY,
+          { from: ACCOUNT_0_ADDRESS }
+        ),
+        'missing role'
+      );
+    });
+
+    it('works as expected', async () => {
+      const randomCode = 'This is a random invitation code';
+      const hash = web3.utils.soliditySha3(randomCode) ?? '';
+      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
+      const signResult = await web3.eth.accounts.sign(
+        hash,
+        ACCOUNT_0_PRIVATE_KEY
+      );
+
+      const invitationChecker = await InvitationChecker.new();
+      const pubKeyChecker = await PubKeyChecker.new();
+      ParticipantManager.link('InvitationChecker', invitationChecker.address);
+      ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
+      const instance = await ParticipantManager.new(
+        'Peter Parker',
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
+      );
+
       await instance.redeemParticipationCode(
         'Paul',
-        address,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_1_ADDRESS,
         signResult.signature,
         randomCode,
-        account1PubKey,
-        { from: accounts[1], value: new BN('1000000000000000') }
+        ACCOUNT_1_PUBLIC_KEY,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
-      const result = await instance.allParticipants(accounts[1]);
-      assert.equal(result[0], accounts[1]);
+      const result = await instance.allParticipants(ACCOUNT_1_ADDRESS);
+      assert.equal(result[0], ACCOUNT_1_ADDRESS);
       assert.equal(result[1], 'Paul');
-      assert.equal(result[2], account1PubKey);
+      assert.equal(result[2], ACCOUNT_1_PUBLIC_KEY);
       assert.equal(result[3], true);
 
-      let hasRole = await instance.hasRole(ownerRoleHash, accounts[1]);
+      let hasRole = await instance.hasRole(ownerRoleHash, ACCOUNT_1_ADDRESS);
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(participantRoleHash, accounts[1]);
+      hasRole = await instance.hasRole(participantRoleHash, ACCOUNT_1_ADDRESS);
       assert.equal(hasRole, true);
-      hasRole = await instance.hasRole(editorRoleHash, accounts[1]);
+      hasRole = await instance.hasRole(updaterRoleHash, ACCOUNT_1_ADDRESS);
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(managerRoleHash, accounts[1]);
+      hasRole = await instance.hasRole(managerRoleHash, ACCOUNT_1_ADDRESS);
       assert.equal(hasRole, false);
-      hasRole = await instance.hasRole(adminRoleHash, accounts[1]);
+      hasRole = await instance.hasRole(adminRoleHash, ACCOUNT_1_ADDRESS);
       assert.equal(hasRole, false);
 
       const deployer = await instance.allParticipantAddresses(1);
-      assert.equal(deployer, accounts[1]);
+      assert.equal(deployer, ACCOUNT_1_ADDRESS);
     });
 
-    it('emits event AddOwner', async () => {
-      const privateKey =
-        '0x6f8074f4d89c4adc637b1afe3f11a14e38953b2df56527a6958ad4bc2a0e411d';
-      const publicKey =
-        '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
-      const address = '0x2BdfC992E37C821BB383613eb5C8134340619C91';
-
+    it('emits event AddParticipant', async () => {
       const randomCode = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(randomCode) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(hash, privateKey);
+      const signResult = await web3.eth.accounts.sign(
+        hash,
+        ACCOUNT_0_PRIVATE_KEY
+      );
 
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       const instance = await ParticipantManager.new(
         'Peter Parker',
-        address,
-        publicKey,
-        paymentManager.address
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
-      const account1PubKey =
-        '0x8772cef469cc91f80ff85df297b02eee52fe66d3b40e0a3959cf406f77d6277f20e9dec05e12fd36dc5622bfaca5dfa6331452eddcd78a6c01fdce5053c29f13';
       const response = await instance.redeemParticipationCode(
         'Paul',
-        address,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_1_ADDRESS,
         signResult.signature,
         randomCode,
-        account1PubKey,
-        { from: accounts[1], value: new BN('1000000000000000') }
+        ACCOUNT_1_PUBLIC_KEY,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
       assert(response.logs.some((log) => log.event === 'AddParticipant'));
     });
 
     it('fails for already redeemed code', async () => {
-      const privateKey =
-        '0x6f8074f4d89c4adc637b1afe3f11a14e38953b2df56527a6958ad4bc2a0e411d';
-      const publicKey =
-        '0x358e51fc0fba247f2c9dab106dd7847396a12bb74a86a88fe5bf26ec6d24ff5631679979da407c8122d5cf93aadde5be23cfcf23fa6d73c62c4e0cd9d5e02436';
-      const address = '0x2BdfC992E37C821BB383613eb5C8134340619C91';
-
       const randomCode = 'This is a random invitation code';
       const hash = web3.utils.soliditySha3(randomCode) ?? '';
       // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(hash, privateKey);
+      const signResult = await web3.eth.accounts.sign(
+        hash,
+        ACCOUNT_0_PRIVATE_KEY
+      );
 
       const invitationChecker = await InvitationChecker.new();
       const pubKeyChecker = await PubKeyChecker.new();
       ParticipantManager.link('InvitationChecker', invitationChecker.address);
       ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
-      const paymentManager = await PaymentManager.new(1000000000000000, 100);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
       const instance = await ParticipantManager.new(
         'Peter Parker',
-        address,
-        publicKey,
-        paymentManager.address
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
-      const account1PubKey =
-        '0x8772cef469cc91f80ff85df297b02eee52fe66d3b40e0a3959cf406f77d6277f20e9dec05e12fd36dc5622bfaca5dfa6331452eddcd78a6c01fdce5053c29f13';
-      const account2PubKey =
-        '0x04030c209dfe7436f45a660fa690738c4d3e35af418135decf72a575b0d4d2f67b90a0801b96b44bd7466eb4a4a49f4fe16f2ab865d78dfff7c0d3fb051b8d6491';
       await instance.redeemParticipationCode(
         'Paul',
-        address,
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_2_ADDRESS,
         signResult.signature,
         randomCode,
-        account1PubKey,
-        { from: accounts[1], value: new BN('1000000000000000') }
+        ACCOUNT_2_PUBLIC_KEY,
+        { from: ACCOUNT_0_ADDRESS }
       );
 
       await expectRevert(
         instance.redeemParticipationCode(
-          'Mallory',
-          address,
+          'Paul',
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_1_ADDRESS,
           signResult.signature,
           randomCode,
-          account2PubKey,
-          { from: accounts[2], value: new BN('1000000000000000') }
+          ACCOUNT_1_PUBLIC_KEY,
+          { from: ACCOUNT_0_ADDRESS }
         ),
         'Already used'
+      );
+    });
+
+    it('fails if user already exists', async () => {
+      const randomCode = 'This is a random invitation code';
+      const hash = web3.utils.soliditySha3(randomCode) ?? '';
+      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
+      const signResult = await web3.eth.accounts.sign(
+        hash,
+        ACCOUNT_0_PRIVATE_KEY
+      );
+
+      const invitationChecker = await InvitationChecker.new();
+      const pubKeyChecker = await PubKeyChecker.new();
+      ParticipantManager.link('InvitationChecker', invitationChecker.address);
+      ParticipantManager.link('PubKeyChecker', pubKeyChecker.address);
+      const creditChecker = await CreditChecker.new();
+      PaymentManager.link('CreditChecker', creditChecker.address);
+      const paymentManager = await PaymentManager.new(
+        1000000000000000,
+        100,
+        1000000000000
+      );
+      const instance = await ParticipantManager.new(
+        'Peter Parker',
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        paymentManager.address,
+        { from: ACCOUNT_0_ADDRESS }
+      );
+
+      await instance.redeemParticipationCode(
+        'Paul',
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_1_ADDRESS,
+        signResult.signature,
+        randomCode,
+        ACCOUNT_1_PUBLIC_KEY,
+        { from: ACCOUNT_0_ADDRESS }
+      );
+
+      await expectRevert(
+        instance.redeemParticipationCode(
+          'Paul',
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_1_ADDRESS,
+          signResult.signature,
+          randomCode,
+          ACCOUNT_1_PUBLIC_KEY,
+          { from: ACCOUNT_0_ADDRESS }
+        ),
+        'User exists'
       );
     });
   });

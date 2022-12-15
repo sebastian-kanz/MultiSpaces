@@ -3,10 +3,11 @@ pragma solidity ^0.8.12;
 import '../Bucket.sol';
 import '@openzeppelin/contracts/access/Ownable.sol';
 import '@openzeppelin/contracts/proxy/Clones.sol';
+import '../ParticipantManager.sol';
+import '../interfaces/IBucketFactory.sol';
 
-contract BucketFactory is Ownable {
+contract BucketFactory is Ownable, IBucketFactory {
   using Clones for address;
-  // TODO: Use minimal proxy here instead of real instance. Makes deployment while cloning much cheaper
   address bucketImplementation;
   address elementImplementation;
   mapping(address => bool) registeredSpaces;
@@ -24,13 +25,23 @@ contract BucketFactory is Ownable {
     elementImplementation = impl;
   }
 
-  function createBucket(address pManager, address partManager)
-    external
-    returns (IBucket)
-  {
+  function createBucket(
+    address pManager,
+    string memory name,
+    address adr,
+    bytes memory publicKey
+  ) external override returns (IBucket) {
     require(registeredSpaces[msg.sender], 'Only registered spaces allowed!');
+    ParticipantManager partManager = new ParticipantManager(
+      name,
+      adr,
+      publicKey,
+      address(pManager)
+    );
+    partManager.grantRole(LibParticipant.OWNER_ROLE, msg.sender);
+    partManager.grantRole(0x00, msg.sender);
     IBucket newBucket = IBucket(bucketImplementation.clone());
-    newBucket.initialize(pManager, partManager, elementImplementation);
+    newBucket.initialize(pManager, address(partManager), elementImplementation);
     return newBucket;
   }
 

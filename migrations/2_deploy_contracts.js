@@ -8,22 +8,33 @@ const Space = artifacts.require("Space");
 const MultiSpaces = artifacts.require("MultiSpaces");
 
 module.exports = async function (deployer, network, accounts) {
-  // Deploy libraries
+
+  async function deployLibraries(timeout) {
+    await deployer.deploy(CreditChecker);
+    await deployer.deploy(PubKeyChecker);
+    await deployer.deploy(InvitationChecker);
+  }
+
+  async function deploy(contract, timeout, ...args) {
+    console.log("Waiting for timeout " + timeout);
+    await new Promise(r => setTimeout(r, timeout));
+    return deployer.deploy(contract, ...args);
+  }
+
+
   await deployer.deploy(CreditChecker);
   await deployer.deploy(PubKeyChecker);
   await deployer.deploy(InvitationChecker);
 
   const bucket = await deployer.deploy(Bucket);
   const element = await deployer.deploy(Element);
-
+  await deployer.link(PubKeyChecker, BucketFactory);
+  await deployer.link(InvitationChecker, BucketFactory);
   const bucketFactory = await deployer.deploy(BucketFactory, bucket.address, element.address);
 
-  // Deploy space
   await deployer.link(PubKeyChecker, Space);
-  await deployer.link(InvitationChecker, Space);
   const space = await deployer.deploy(Space);
 
-  // Deploy multi spaces
   await deployer.link(CreditChecker, MultiSpaces);
   const multiSpaces = await deployer.deploy(MultiSpaces, bucketFactory.address, space.address);
 

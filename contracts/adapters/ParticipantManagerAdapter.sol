@@ -26,10 +26,33 @@ abstract contract ParticipantManagerAdapter {
     }
   }
 
+  // function _onlyRoleAuthorized(bytes32 role, address issuer) internal view {
+  //   if (!participantManager.hasRoleAuthorized(role, issuer, msg.sender)) {
+  //     revert(
+  //       string(
+  //         abi.encodePacked(
+  //           'AccessControl: account ',
+  //           Strings.toHexString(uint160(msg.sender), 20),
+  //           ' is unauthorized'
+  //         )
+  //       )
+  //     );
+  //   }
+  // }
+
   modifier onlyRole(bytes32 role) {
     _onlyRole(role);
     _;
   }
+
+  // modifier onlyRoleAuthorized(bytes32 role, address issuer) {
+  //   _onlyRoleAuthorized(role, issuer);
+  //   _;
+  // }
+
+  // function authorizedSender(address issuer) internal view returns (address) {
+  //   return participantManager.authorizedSender(issuer, msg.sender);
+  // }
 
   function participantCount() internal view returns (uint256) {
     return participantManager.participantCount();

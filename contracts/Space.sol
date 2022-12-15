@@ -5,7 +5,6 @@ import './interfaces/IBucket.sol';
 import './interfaces/IBucketFactory.sol';
 import './interfaces/IPaymentManager.sol';
 import './libraries/LibParticipant.sol';
-import './ParticipantManager.sol';
 import './adapters/PaymentAdapter.sol';
 import '@openzeppelin/contracts/proxy/utils/Initializable.sol';
 
@@ -48,7 +47,7 @@ contract Space is PaymentAdapter, Initializable {
   }
 
   function _bucketActive(string memory name) private view {
-    require(allBuckets[name].active, 'Bucket is not active or does not exist!');
+    require(allBuckets[name].active, 'Bucket inactive / unknown!');
   }
 
   modifier bucketActive(string memory name) {
@@ -78,15 +77,11 @@ contract Space is PaymentAdapter, Initializable {
     returns (address)
   {
     require(!allBuckets[name].active, 'Bucket already exists!');
-    ParticipantManager partManager = new ParticipantManager(
-      spaceOwner.name,
-      spaceOwner.adr,
-      spaceOwner.publicKey,
-      address(paymentManager)
-    );
     IBucket bucket = bucketFactory.createBucket(
       address(paymentManager),
-      address(partManager)
+      spaceOwner.name,
+      spaceOwner.adr,
+      spaceOwner.publicKey
     );
     allBuckets[name] = BucketContainer(bucket, true);
     allBucketNames.push(name);
@@ -140,7 +135,7 @@ contract Space is PaymentAdapter, Initializable {
         foundIndex = int256(i);
       }
     }
-    require(foundIndex >= 0, 'Bucket does not exist!');
+    require(foundIndex >= 0, 'Bucket unknown!');
     allBucketNames[uint256(foundIndex)] = allBucketNames[
       allBucketNames.length - 1
     ];

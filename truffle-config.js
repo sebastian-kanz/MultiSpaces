@@ -24,23 +24,30 @@ module.exports = {
     },
     alfajores: {
       provider: new HDWalletProvider({
-        privateKeys: [process.env.PRIVATE_KEY],
+        privateKeys: [process.env.ACCOUNT_0_PRIVATE_KEY],
         providerOrUrl: `https://alfajores-forno.celo-testnet.org`
       }),
       network_id: 44787,
       gas: 20000000
     },
     goerli: {
-      // provider: () => new HDWalletProvider({
-      //   privateKeys: ["6f8074f4d89c4adc637b1afe3f11a14e38953b2df56527a6958ad4bc2a0e411d"],
-      //   // mnemonic: process.env.MNEMONIC,
-      //   providerOrUrl: `https://goerli.infura.io/v3/${process.env.infuraProjectId}`,
-      // }),
       provider: () => new HDWalletProvider(process.env.MNEMONIC, `https://goerli.infura.io/v3/${process.env.infuraProjectId}`),
       from: '0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D',
       network_id: 5,
       timeoutBlocks: 200,
       networkCheckTimeout: 10000,
+    },
+    matic: {
+      // provider: () => new HDWalletProvider(process.env.MNEMONIC, `https://rpc-mumbai.maticvigil.com/v1/1861e50894501745b2a53b966b577fa8ac3efea9`),
+      provider: () => new HDWalletProvider(process.env.MNEMONIC, `https://polygon-mumbai.g.alchemy.com/v2/lhVv94odHT0ekv-p8L1PPzVxEwhlLmE9`),
+      from: '0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D',
+      network_id: 80001,
+      timeoutBlocks: 200,
+      networkCheckTimeout: 10000,
+      skipDryRun: true,
+      // reduces request load (e.g. to Alchemy) dramatically 
+      pollingInterval: 1800000,
+      disableConfirmationListener: true,
     },
   },
 

@@ -8,10 +8,13 @@ import './libraries/InvitationChecker.sol';
 import './libraries/PubKeyChecker.sol';
 import './adapters/PaymentAdapter.sol';
 
+// import './Authorization.sol';
+
 contract ParticipantManager is
   IParticipantManager,
   AccessControl,
   PaymentAdapter
+  // Authorization
 {
   using LibParticipant for *;
   using PubKeyChecker for address;
@@ -29,7 +32,7 @@ contract ParticipantManager is
 
   bytes32[4] public ALL_ROLES = [
     LibParticipant.PARTICIPANT_ROLE,
-    LibParticipant.UPDATEOR_ROLE,
+    LibParticipant.UPDATER_ROLE,
     LibParticipant.MANAGER_ROLE,
     LibParticipant.OWNER_ROLE
   ];
@@ -40,8 +43,8 @@ contract ParticipantManager is
     bytes memory pubKey,
     address pManager
   ) {
-    // TODO: Add more roles to msg.sender (space) to ensure space can interact with bucket
     _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    _grantRole(LibParticipant.OWNER_ROLE, msg.sender);
     require(
       keccak256(abi.encodePacked(name)) != keccak256(abi.encodePacked('')),
       'Missing name'
@@ -52,7 +55,7 @@ contract ParticipantManager is
     roles[0] = DEFAULT_ADMIN_ROLE;
     roles[1] = LibParticipant.OWNER_ROLE;
     roles[2] = LibParticipant.MANAGER_ROLE;
-    roles[3] = LibParticipant.UPDATEOR_ROLE;
+    roles[3] = LibParticipant.UPDATER_ROLE;
     roles[4] = LibParticipant.PARTICIPANT_ROLE;
     _addParticipant(participant, name, pubKey);
 
@@ -63,9 +66,10 @@ contract ParticipantManager is
 
     paymentManager = IPaymentManager(pManager);
     _setPaymentManager(pManager);
+    // GENESIS = block.number;
   }
 
-  function participantCount() external view returns (uint256) {
+  function participantCount() external view override returns (uint256) {
     return allParticipantAddresses.length;
   }
 
@@ -77,6 +81,24 @@ contract ParticipantManager is
   {
     return AccessControl.hasRole(role, account);
   }
+
+  // function hasRoleAuthorized(
+  //   bytes32 role,
+  //   address issuer,
+  //   address holder
+  // ) public view returns (bool) {
+  //   // TODO: Check authorization
+  //   return AccessControl.hasRole(role, issuer);
+  // }
+
+  // function authorizedSender(address issuer, address holder)
+  //   external
+  //   view
+  //   override
+  //   returns (address)
+  // {
+  //   return _authorizedSender(issuer, holder);
+  // }
 
   function _addParticipant(
     address adr,
@@ -108,7 +130,7 @@ contract ParticipantManager is
     allParticipantAddresses.pop();
     // Remove all roles for participant
     for (uint256 i = 0; i < ALL_ROLES.length; i++) {
-      renounceRole(ALL_ROLES[i], participant);
+      _revokeRole(ALL_ROLES[i], participant);
     }
     emit RemoveParticipant(participant);
   }
