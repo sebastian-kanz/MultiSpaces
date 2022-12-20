@@ -107,9 +107,6 @@ jobs:
       - name: Generate size report
         run: npm run size
 
-      - name: Print size report
-        run: cat size.txt
-
   analyze:
     runs-on: ubuntu-latest
 
