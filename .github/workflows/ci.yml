@@ -117,7 +117,7 @@ jobs:
           gistID: 6b1becf89882397d41d0651c68c1d30f
           filename: test.json
           label: Max contract size
-          message: grep -Eo '[0-9.]+' size.txt | sort -rn | head -n 1
+          message: ${{ grep -Eo '[0-9.]+' size.txt | sort -rn | head -n 1 }}
           color: orange
 
   analyze:
