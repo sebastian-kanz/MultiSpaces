@@ -44,15 +44,15 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+
       - name: Clean up
         run: npm run clean
 
       - name: Build
         run: npm run compile
-
-      - name: Create .env file
-        run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Print accounts
         run: npm run accounts
@@ -94,15 +94,15 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+
       - name: Clean up
         run: npm run clean
 
       - name: Build
         run: npm run compile
-
-      - name: Create .env file
-        run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Print size report
         run: cat size.txt
@@ -138,15 +138,15 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
+      - name: Create .env file
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+
       - name: Clean up
         run: npm run clean
 
       - name: Build
         run: npm run compile
-
-      - name: Create .env file
-        run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
         
       - name: Test coverage
         run: npm run coverage
