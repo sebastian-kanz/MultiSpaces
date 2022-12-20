@@ -105,7 +105,10 @@ jobs:
         run: npm run compile
 
       - name: Generate size report
-        run: npm run size
+        run: npm run size >> size.txt
+
+      - name: Print size report
+        run: cat size.txt
 
   analyze:
     runs-on: ubuntu-latest
@@ -159,7 +162,7 @@ jobs:
           fail_ci_if_error: true # optional (default = false)
           verbose: true # optional (default = false)
 
-      - name: 📊 Crunch Numbers
+      - name: Crunch Numbers
         uses: tintinweb/solidity-metrics-action@v1
         id: metrics
         with:
