@@ -1,69 +1,80 @@
-import { getAccountKeys } from '../keys.helper';
+import { getAccountKeys } from "../helpers/keys.helper";
+import { expect } from "chai";
+import hre from "hardhat";
 
-const InvitationChecker = artifacts.require('InvitationChecker');
+const { ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } = getAccountKeys();
 
-const { ACCOUNT_0_PRIVATE_KEY, ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } =
-  getAccountKeys();
+describe("InvitationChecker", () => {
+  describe("Validating invitation", () => {
+    it("identifies correct signature", async () => {
+      const text = "This is a random invitation code";
 
-contract('InvitationChecker', () => {
-  describe('Validating invitation', () => {
-    it('identifies correct signature', async () => {
-      const text = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(text) ?? '';
+      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
+      const hash = hre.ethers.utils.arrayify(stringHash);
 
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const InvitationChecker = await hre.ethers.getContractFactory(
+        "InvitationChecker"
       );
-      const instance = await InvitationChecker.new();
-
+      const instance = await InvitationChecker.deploy();
       const result = await instance.isValidInvitation(
-        signResult.signature,
+        signResult,
         ACCOUNT_0_ADDRESS,
         text
       );
-      assert.equal(result[0], true);
-      assert.equal(result[1], hash, 'Hash comparison failed');
+      expect(result[0]).to.be.true;
+      expect(result[1] === stringHash, "Hash comparison failed");
     });
 
-    it('fails for invalid invitation code', async () => {
-      const text = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(text) ?? '';
+    it("fails for invalid invitation code", async () => {
+      const text = "This is a random invitation code";
 
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
+      const hash = hre.ethers.utils.arrayify(stringHash);
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const InvitationChecker = await hre.ethers.getContractFactory(
+        "InvitationChecker"
       );
-      const instance = await InvitationChecker.new();
-
+      const instance = await InvitationChecker.deploy();
       const result = await instance.isValidInvitation(
-        signResult.signature,
+        signResult,
         ACCOUNT_0_ADDRESS,
-        'invalid code'
+        "invalid code"
       );
-      assert.equal(result[0], false);
-      assert.notEqual(result[1], hash, 'Hash comparison failed');
+      expect(result[0]).to.be.false;
+      expect(result[1] !== stringHash, "Hash comparison failed");
     });
 
-    it('identifies invalid signer', async () => {
-      const text = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(text) ?? '';
+    it("identifies invalid signer", async () => {
+      const text = "This is a random invitation code";
 
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
+      const hash = hre.ethers.utils.arrayify(stringHash);
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const InvitationChecker = await hre.ethers.getContractFactory(
+        "InvitationChecker"
       );
-      const instance = await InvitationChecker.new();
-
+      const instance = await InvitationChecker.deploy();
       const result = await instance.isValidInvitation(
-        signResult.signature,
+        signResult,
         ACCOUNT_1_ADDRESS,
         text
       );
-      assert(result[0] === false, 'Signature validation failed');
+      expect(result[0]).to.be.false;
     });
   });
 });

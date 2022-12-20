@@ -1,72 +1,95 @@
-import { getAccountKeys } from '../keys.helper';
+import { getAccountKeys } from "../helpers/keys.helper";
+import { expect } from "chai";
+import hre from "hardhat";
 
-const CreditChecker = artifacts.require('CreditChecker');
+const { ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } = getAccountKeys();
 
-const { ACCOUNT_0_PRIVATE_KEY, ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } =
-  getAccountKeys();
-
-contract('CreditChecker', () => {
-  describe('Validating credits', () => {
-    it('identifies correct signature', async () => {
+describe("CreditChecker", () => {
+  describe("Validating credits", () => {
+    it("identifies correct signature", async () => {
       const credit = 1;
-      const random = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(credit, random) ?? '';
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      const random = "This is a random invitation code";
+      const stringHash = hre.ethers.utils.solidityKeccak256(
+        ["uint256", "string"],
+        [credit, random]
       );
-      const instance = await CreditChecker.new();
+      const hash = hre.ethers.utils.arrayify(stringHash);
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const CreditChecker = await hre.ethers.getContractFactory(
+        "CreditChecker"
+      );
+      const instance = await CreditChecker.deploy();
 
       const result = await instance.isValidCredit(
-        signResult.signature,
+        signResult,
         ACCOUNT_0_ADDRESS,
         credit,
         random
       );
-      assert.equal(result[0], true);
-      assert.equal(result[1], hash, 'Hash comparison failed');
+      expect(result[0]).to.be.true;
+      expect(result[1] === stringHash, "Hash comparison failed");
     });
 
-    it('fails for invalid invitation code', async () => {
+    it("fails for invalid invitation code", async () => {
       const credit = 1;
-      const random = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(credit, random) ?? '';
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      const random = "This is a random invitation code";
+      const stringHash = hre.ethers.utils.solidityKeccak256(
+        ["uint256", "string"],
+        [credit, random]
       );
-      const instance = await CreditChecker.new();
+      const hash = hre.ethers.utils.arrayify(stringHash);
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const CreditChecker = await hre.ethers.getContractFactory(
+        "CreditChecker"
+      );
+      const instance = await CreditChecker.deploy();
 
       const result = await instance.isValidCredit(
-        signResult.signature,
+        signResult,
         ACCOUNT_0_ADDRESS,
         credit,
-        'invalid'
+        "invalid"
       );
-      assert.equal(result[0], false);
-      assert.notEqual(result[1], hash, 'Hash comparison failed');
+      expect(result[0]).to.be.false;
+      expect(result[1] !== stringHash, "Hash comparison failed");
     });
 
-    it('identifies invalid signer', async () => {
+    it("identifies invalid signer", async () => {
       const credit = 1;
-      const random = 'This is a random invitation code';
-      const hash = web3.utils.soliditySha3(credit, random) ?? '';
-      // web3.eth.accounts.sign adds 'Ethereum signed message', so we dont need to manually add it here
-      const signResult = await web3.eth.accounts.sign(
-        hash,
-        ACCOUNT_0_PRIVATE_KEY
+      const random = "This is a random invitation code";
+      const stringHash = hre.ethers.utils.solidityKeccak256(
+        ["uint256", "string"],
+        [credit, random]
       );
-      const instance = await CreditChecker.new();
+      const hash = hre.ethers.utils.arrayify(stringHash);
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_0_ADDRESS)
+      ).signMessage(hash);
+
+      const CreditChecker = await hre.ethers.getContractFactory(
+        "CreditChecker"
+      );
+      const instance = await CreditChecker.deploy();
 
       const result = await instance.isValidCredit(
-        signResult.signature,
+        signResult,
         ACCOUNT_1_ADDRESS,
         credit,
-        random
+        "invalid"
       );
-      assert(result[0] === false, 'Signature validation failed');
+      expect(result[0] === false, "Signature validation failed");
     });
   });
 });

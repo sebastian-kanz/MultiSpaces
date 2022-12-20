@@ -1,13 +1,14 @@
-build
 node_modules
-types
-.DS_Store
 .env
-.deps
-coverage.json
 coverage
-multi_spaces
-**/artifacts
-.coverage_artifacts/
-.coverage_contracts/
+coverage.json
 gas-report.txt
+typechain
+typechain-types
+
+# Hardhat files
+cache
+artifacts
+
+
+multi_spaces

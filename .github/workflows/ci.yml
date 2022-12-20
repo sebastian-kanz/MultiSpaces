@@ -46,15 +46,14 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
-      - name: Build if no dependencies installed
-        if: steps.cache-nodemodules.outputs.cache-hit == 'true'
-        run: npm run postinstall
+      - name: Clean up
+        run: npm run clean
 
-      - name: Lint
-        run: npm run lint
+      - name: Build
+        run: npm run compile
 
       - name: Test
-        run: npm run test:matic
+        run: npm run test
 
       - name: Print gas report
         run: cat gas-report.txt
@@ -90,12 +89,11 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
-      - name: Build if no dependencies installed
-        if: steps.cache-nodemodules.outputs.cache-hit == 'true'
-        run: npm run postinstall
+      - name: Clean up
+        run: npm run clean
 
-      - name: Report size
-        run: npm run size >> size.txt
+      - name: Build
+        run: npm run compile
 
       - name: Print size report
         run: cat size.txt
@@ -131,9 +129,11 @@ jobs:
         if: steps.cache-nodemodules.outputs.cache-hit != 'true'
         run: npm ci --include=dev
 
-      - name: Build if no dependencies installed
-        if: steps.cache-nodemodules.outputs.cache-hit == 'true'
-        run: npm run postinstall
+      - name: Clean up
+        run: npm run clean
+
+      - name: Build
+        run: npm run compile
         
       - name: Test coverage
         run: npm run coverage
