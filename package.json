@@ -8,6 +8,7 @@
     "size": "npx hardhat size-contracts",
     "clean": "npx hardhat clean && rimraf build contracts/build",
     "test": "npx hardhat test",
+    "accounts": "npx hardhat accounts",
     "typechain": "npx hardhat typechain",
     "deploy:mumbai": "npx hardhat run scripts/deploy.ts --network polygon_mumbai"
   },
