@@ -104,6 +104,9 @@ jobs:
       - name: Build
         run: npm run compile
 
+      - name: Generate size report
+        run: npm run size
+
       - name: Print size report
         run: cat size.txt
 
