@@ -162,16 +162,16 @@ jobs:
           fail_ci_if_error: true # optional (default = false)
           verbose: true # optional (default = false)
 
-      - name: Crunch Numbers
-        uses: tintinweb/solidity-metrics-action@v1
-        id: metrics
-        with:
-            target: '{,**/}*.sol'
+      # - name: Crunch Numbers
+      #   uses: tintinweb/solidity-metrics-action@v1
+      #   id: metrics
+      #   with:
+      #       target: '{,**/}*.sol'
             
-      - uses: actions/upload-artifact@v3
-        with:
-          name: metrics.html
-          path: ${{ steps.metrics.outputs.report }}
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: metrics.html
+      #     path: ${{ steps.metrics.outputs.report }}
           
       - name: Create Awesome Badge
         uses: schneegans/dynamic-badges-action@v1.4.0
