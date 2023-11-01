@@ -16,7 +16,7 @@ describe("PaymentManager", () => {
       "PaymentManager",
       {
         libraries: {
-          CreditChecker: creditChecker.address,
+          CreditChecker: await creditChecker.getAddress(),
         },
       }
     );
@@ -31,26 +31,28 @@ describe("PaymentManager", () => {
   describe("Getting the data", () => {
     it("Works as expected", async () => {
       const defaultLimitAdd = await paymentManager.DEFAULT_LIMITS(0);
-      expect(defaultLimitAdd.eq(100), "Default limit (add) incorrect!");
+      expect(Number(defaultLimitAdd), "Default limit (add) incorrect!").to.eq(
+        100
+      );
       const limitPrice = await paymentManager.limitPrice();
-      expect(limitPrice.eq(1000000000000), "Limit price incorrect!");
+      expect(Number(limitPrice), "Limit price incorrect!").to.eq(1000000000000);
       const defaultPaymentCreate = await paymentManager.DEFAULT_PAYMENTS(0);
       const defaultPaymentAdd = await paymentManager.DEFAULT_PAYMENTS(1);
       const defaultPaymentParticipant = await paymentManager.DEFAULT_PAYMENTS(
         2
       );
       expect(
-        defaultPaymentCreate.eq(1000000000000000),
+        Number(defaultPaymentCreate),
         "Default payment (create) incorrect!"
-      );
+      ).to.eq(1000000000000000);
       expect(
-        defaultPaymentAdd.eq(1000000000000000),
+        Number(defaultPaymentAdd),
         "Default payment (add) incorrect!"
-      );
+      ).to.eq(1000000000000000);
       expect(
-        defaultPaymentParticipant.eq(1000000000000000),
+        Number(defaultPaymentParticipant),
         "Default payment (participant) incorrect!"
-      );
+      ).to.eq(1000000000000000);
       const freeOfCharge0 = await paymentManager.isFreeOfCharge(
         ACCOUNT_0_ADDRESS,
         0
@@ -63,9 +65,9 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         2
       );
-      expect(!freeOfCharge0, "freeOfCharge0 incorrect!");
-      expect(!freeOfCharge1, "freeOfCharge1 incorrect!");
-      expect(!freeOfCharge2, "freeOfCharge2 incorrect!");
+      expect(freeOfCharge0, "freeOfCharge0 incorrect!").to.be.false;
+      expect(freeOfCharge1, "freeOfCharge1 incorrect!").to.be.false;
+      expect(freeOfCharge2, "freeOfCharge2 incorrect!").to.be.false;
       const voucherCount0 = await paymentManager.getVoucherCount(
         ACCOUNT_0_ADDRESS,
         0
@@ -78,32 +80,25 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         2
       );
-      expect(voucherCount0.eq(0), "voucherCount0 incorrect!");
-      expect(voucherCount1.eq(0), "voucherCount1 incorrect!");
-      expect(voucherCount2.eq(0), "voucherCount2 incorrect!");
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
-      expect(limit.eq(0), "limit incorrect!");
+      expect(Number(voucherCount0), "voucherCount0 incorrect!").to.eq(0);
+      expect(Number(voucherCount1), "voucherCount1 incorrect!").to.eq(0);
+      expect(Number(voucherCount2), "voucherCount2 incorrect!").to.eq(0);
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limit), "limit incorrect!").to.eq(0);
       const balance = await paymentManager.getBalance(ACCOUNT_0_ADDRESS);
-      expect(balance.eq(0), "balance incorrect!");
+      expect(Number(balance), "balance incorrect!").to.eq(0);
     });
   });
 
   describe("Decreasing a limit", () => {
     it("initializes the limit for an account if not yet initialized", async () => {
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       await paymentManager.decreaseLimit(0, 1);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
+      const limitAfter = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limit), "Limit already initialized.").to.eq(0);
+      expect(Number(limit), "Limit initializing failed.").to.be.lt(
+        Number(limitAfter)
       );
-      expect(limit.eq(0), "Limit already initialized.");
-      expect(limit.lt(limitAfter), "Limit initializing failed.");
     });
 
     it("fails if limit is depleted", async () => {
@@ -114,16 +109,12 @@ describe("PaymentManager", () => {
 
     it("decreases the limit of an account", async () => {
       await paymentManager.decreaseLimit(0, 1);
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       await paymentManager.decreaseLimit(0, 1);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
+      const limitAfter = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limitAfter), "Limit decreasing failed.").to.be.lt(
+        Number(limit)
       );
-      expect(limitAfter.lt(limit), "Limit decreasing failed.");
     });
 
     it("emits event", async () => {
@@ -136,35 +127,25 @@ describe("PaymentManager", () => {
     it("does not decrease limit if unlimited", async () => {
       await paymentManager.decreaseLimit(0, 1);
       await paymentManager.setAccountUnlimited(ACCOUNT_0_ADDRESS, 0, true);
-      const limitBefore = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limitBefore = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       await paymentManager.decreaseLimit(0, 1);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limitAfter = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       expect(
-        limitBefore.eq(limitAfter),
+        Number(limitBefore),
         "Limit should not have been decreased."
-      );
+      ).to.eq(Number(limitAfter));
     });
   });
 
   describe("Increasing a limit", () => {
     it("initializes the limit for an account if not yet initialized", async () => {
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       await paymentManager.increaseLimit(0, 1, ACCOUNT_0_ADDRESS);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
+      const limitAfter = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limit), "Limit already initialized.").to.eq(0);
+      expect(Number(limit), "Limit initializing failed.").to.be.lt(
+        Number(limitAfter)
       );
-      expect(limit.eq(0), "Limit already initialized.");
-      expect(limit.lt(limitAfter), "Limit initializing failed.");
     });
 
     it("works for owner without value", async () => {
@@ -180,16 +161,12 @@ describe("PaymentManager", () => {
     });
 
     it("increases the limit of an account", async () => {
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
       await paymentManager.increaseLimit(0, 1, ACCOUNT_0_ADDRESS);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
+      const limitAfter = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limitAfter), "Limit increasing failed.").to.be.gt(
+        Number(limit)
       );
-      expect(limitAfter.gt(limit), "Limit increasing failed.");
     });
 
     it("emits event", async () => {
@@ -218,8 +195,10 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(balance.eq(balanceAfter), "Balance incorrect.");
-      expect(vouchers.eq(vouchersAfter), "Vourchers incorrect.");
+      expect(Number(balance), "Balance incorrect.").to.eq(Number(balanceAfter));
+      expect(Number(vouchers), "Vourchers incorrect.").to.eq(
+        Number(vouchersAfter)
+      );
       expect(receipt)
         .to.emit(paymentManager, "PayableActionEvent")
         .withArgs(0, ACCOUNT_0_ADDRESS, 0, false, true);
@@ -238,8 +217,10 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(balance.eq(balanceAfter), "Balance incorrect.");
-      expect(vouchers.gt(vouchersAfter), "Vourchers incorrect.");
+      expect(Number(balance), "Balance incorrect.").to.eq(Number(balanceAfter));
+      expect(Number(vouchers), "Vourchers incorrect.").to.be.gt(
+        Number(vouchersAfter)
+      );
       expect(receipt)
         .to.emit(paymentManager, "PayableActionEvent")
         .withArgs(0, ACCOUNT_0_ADDRESS, 1, true, false);
@@ -248,7 +229,7 @@ describe("PaymentManager", () => {
     it("then charges credits if existing", async () => {
       const signer = await ethers.getSigner(ACCOUNT_0_ADDRESS);
       const tx = {
-        to: paymentManager.address,
+        to: await paymentManager.getAddress(),
         value: 2000000000000000,
       };
       await signer.sendTransaction(tx);
@@ -263,8 +244,12 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(balance.gt(balanceAfter), "Balance incorrect.");
-      expect(vouchers.eq(vouchersAfter), "Vourchers incorrect.");
+      expect(Number(balance), "Balance incorrect.").to.be.gt(
+        Number(balanceAfter)
+      );
+      expect(Number(vouchers), "Vourchers incorrect.").to.eq(
+        Number(vouchersAfter)
+      );
       expect(receipt)
         .to.emit(paymentManager, "PayableActionEvent")
         .withArgs(0, ACCOUNT_0_ADDRESS, 0, false, false);
@@ -284,8 +269,10 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(balance.eq(balanceAfter), "Balance incorrect.");
-      expect(vouchers.eq(vouchersAfter), "Vourchers incorrect.");
+      expect(Number(balance), "Balance incorrect.").to.eq(Number(balanceAfter));
+      expect(Number(vouchers), "Vourchers incorrect.").to.eq(
+        Number(vouchersAfter)
+      );
       expect(receipt)
         .to.emit(paymentManager, "PayableActionEvent")
         .withArgs(0, ACCOUNT_0_ADDRESS, 1000000000000000, false, false);
@@ -296,8 +283,8 @@ describe("PaymentManager", () => {
     it("works as expected", async () => {
       const credit = 1;
       const random = "This is a random invitation code";
-      const hash = hre.ethers.utils.arrayify(
-        hre.ethers.utils.solidityKeccak256(
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(
           ["uint256", "string"],
           [credit, random]
         )
@@ -317,15 +304,15 @@ describe("PaymentManager", () => {
         { value: credit }
       );
       const balanceAfter = await paymentManager.getBalance(ACCOUNT_1_ADDRESS);
-      expect(balance.eq(0), "Balance incorrect!");
-      expect(balanceAfter.eq(0), "Balance incorrect!");
+      expect(Number(balance), "Balance incorrect!").to.eq(0);
+      expect(Number(balanceAfter), "Balance incorrect!").to.eq(1);
     });
 
     it("works only once for a signature", async () => {
       const credit = 1;
       const random = "This is a random invitation code";
-      const hash = hre.ethers.utils.arrayify(
-        hre.ethers.utils.solidityKeccak256(
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(
           ["uint256", "string"],
           [credit, random]
         )
@@ -362,9 +349,7 @@ describe("PaymentManager", () => {
         value: 100,
       });
       const creditsAfter = await paymentManager.getBalance(ACCOUNT_1_ADDRESS);
-      expect(creditsAfter.eq(creditsBefore.add(100))).to.be.revertedWith(
-        new RegExp(/Wrong credit amount./)
-      );
+      expect(Number(creditsAfter)).to.eq(Number(creditsBefore) + 100);
     });
   });
 
@@ -372,12 +357,12 @@ describe("PaymentManager", () => {
     it("increases the balance of the sender", async () => {
       const signer = await ethers.getSigner(ACCOUNT_0_ADDRESS);
       const tx = {
-        to: paymentManager.address,
+        to: await paymentManager.getAddress(),
         value: 1000,
       };
       await signer.sendTransaction(tx);
       const balance = await paymentManager.getBalance(ACCOUNT_0_ADDRESS);
-      expect(balance.eq(1000), "Balance incorrect.");
+      expect(Number(balance), "Balance incorrect.").to.eq(1000);
     });
   });
 
@@ -385,14 +370,16 @@ describe("PaymentManager", () => {
     it("increases receiver's credits with amount", async () => {
       const signer = await ethers.getSigner(ACCOUNT_0_ADDRESS);
       const tx = {
-        to: paymentManager.address,
+        to: await paymentManager.getAddress(),
         value: 1000,
       };
       await signer.sendTransaction(tx);
       const creditsBefore = await paymentManager.getBalance(ACCOUNT_1_ADDRESS);
       await paymentManager.transferCredits(10, ACCOUNT_1_ADDRESS);
       const creditsAfter = await paymentManager.getBalance(ACCOUNT_1_ADDRESS);
-      expect(creditsAfter.eq(creditsBefore.add(10)), "Wrong credit amount.");
+      expect(Number(creditsAfter), "Wrong credit amount.").to.eq(
+        Number(creditsBefore) + 10
+      );
     });
 
     it("fails if sender's balance in insufficient", async () => {
@@ -417,7 +404,7 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(freeOfCharge, "Not free of charge");
+      expect(freeOfCharge, "Not free of charge").to.be.true;
     });
   });
 
@@ -433,7 +420,7 @@ describe("PaymentManager", () => {
     it("works as expected", async () => {
       await paymentManager.setAccountUnlimited(ACCOUNT_0_ADDRESS, 0, true);
       const unlimited = await paymentManager.isUnlimited(ACCOUNT_0_ADDRESS, 0);
-      expect(unlimited, "Not unlimited.");
+      expect(unlimited, "Not unlimited.").to.be.true;
     });
   });
 
@@ -452,18 +439,15 @@ describe("PaymentManager", () => {
         ACCOUNT_0_ADDRESS,
         0
       );
-      expect(vouchers.eq(10), "Vouchers incorrect");
+      expect(Number(vouchers), "Vouchers incorrect").to.eq(10);
     });
   });
 
   describe("Adding a limit", () => {
     it("works as expected", async () => {
       await paymentManager.addLimit(ACCOUNT_0_ADDRESS, 0, 10);
-      const limit = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
-      );
-      expect(limit.eq(110), "Limit incorrect");
+      const limit = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(limit), "Limit incorrect").to.eq(110);
     });
   });
 
@@ -481,9 +465,9 @@ describe("PaymentManager", () => {
       const defaultPayment0 = await paymentManager.DEFAULT_PAYMENTS(0);
       const defaultPayment1 = await paymentManager.DEFAULT_PAYMENTS(1);
       const defaultPayment2 = await paymentManager.DEFAULT_PAYMENTS(2);
-      expect(defaultPayment0.eq(1));
-      expect(defaultPayment1.eq(1));
-      expect(defaultPayment2.eq(1));
+      expect(Number(defaultPayment0)).to.eq(1);
+      expect(Number(defaultPayment1)).to.eq(1);
+      expect(Number(defaultPayment2)).to.eq(1);
     });
   });
 
@@ -499,7 +483,7 @@ describe("PaymentManager", () => {
     it("works as expected", async () => {
       await paymentManager.setDefaultLimit(1);
       const defaultLimit0 = await paymentManager.DEFAULT_LIMITS(0);
-      expect(defaultLimit0.eq(1));
+      expect(Number(defaultLimit0)).to.eq(1);
     });
   });
 
@@ -514,20 +498,21 @@ describe("PaymentManager", () => {
 
     it("sends all ether to owner", async () => {
       const signer = await ethers.getSigner(ACCOUNT_0_ADDRESS);
-      const balanceBefore = await signer.getBalance();
+      const balanceBefore = await ethers.provider.getBalance(ACCOUNT_0_ADDRESS);
       const tx = {
-        to: paymentManager.address,
+        to: await paymentManager.getAddress(),
         value: 1000000000000000,
       };
       await signer.sendTransaction(tx);
-      const balanceAfter = await signer.getBalance();
+      const balanceAfter = await ethers.provider.getBalance(ACCOUNT_0_ADDRESS);
       await paymentManager.manufacturerWithdraw();
-      const balanceLast = await signer.getBalance();
+      const balanceLast = await ethers.provider.getBalance(ACCOUNT_0_ADDRESS);
+
       const owner = await paymentManager.owner();
-      expect(owner === ACCOUNT_0_ADDRESS, "Wrong owner.");
-      expect(balanceBefore > balanceAfter, "Balances 1 not equal.");
-      expect(balanceLast > balanceAfter, "Balances 2 not equal.");
-      expect(balanceBefore > balanceLast, "Balances 3 not equal.");
+      expect(owner, "Wrong owner.").to.eq(ACCOUNT_0_ADDRESS);
+      expect(balanceBefore, "Balances 1 not equal.").to.be.gt(balanceAfter);
+      expect(balanceLast, "Balances 2 not equal.").to.be.gt(balanceAfter);
+      expect(balanceBefore, "Balances 3 not equal.").to.be.gt(balanceLast);
     });
   });
 });

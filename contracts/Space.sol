@@ -56,21 +56,15 @@ contract Space is PaymentAdapter, Initializable {
         _;
     }
 
-    event Create(
-        string indexed _name,
-        address indexed _addr,
-        address indexed _sender
-    );
+    event Create(address indexed _addr, address _sender);
 
-    event Remove(string indexed _name, address indexed _sender);
+    event Remove(address indexed _addr, address _sender);
 
-    event Rename(
-        string indexed _name,
-        string indexed _newName,
-        address indexed _sender
-    );
+    event Rename(address indexed _addr, address _sender);
 
-    function addBucket(string memory name)
+    function addBucket(
+        string memory name
+    )
         external
         payable
         onlySpaceOwner
@@ -86,44 +80,40 @@ contract Space is PaymentAdapter, Initializable {
         );
         allBuckets[name] = BucketContainer(bucket, true, false);
         allBucketNames.push(name);
-        emit Create(name, address(bucket), msg.sender);
+        emit Create(address(bucket), msg.sender);
         return address(bucket);
     }
 
     // TODO: Test
-    function addExternalBucket(string memory name, address adr)
-        external
-        payable
-        onlySpaceOwner
-        returns (address)
-    {
+    function addExternalBucket(
+        string memory name,
+        address adr
+    ) external payable onlySpaceOwner returns (address) {
         require(!allBuckets[name].active, "Bucket already exists!");
         IBucket bucket = IBucket(adr);
         allBuckets[name] = BucketContainer(bucket, true, true);
         allBucketNames.push(name);
-        emit Create(name, address(bucket), msg.sender);
+        emit Create(address(bucket), msg.sender);
         return address(bucket);
     }
 
-    function removeBucket(string memory name)
-        external
-        onlySpaceOwner
-        bucketActive(name)
-    {
+    function removeBucket(
+        string memory name
+    ) external onlySpaceOwner bucketActive(name) {
         // TODO: Test
         if (!allBuckets[name].isExternal) {
             allBuckets[name].bucket.closeBucket();
         }
         _removeBucketNameFromList(name);
+        address bucket = address(allBuckets[name].bucket);
         delete (allBuckets[name]);
-        emit Remove(name, msg.sender);
+        emit Remove(bucket, msg.sender);
     }
 
-    function renameBucket(string memory name, string memory newBucketName)
-        external
-        onlySpaceOwner
-        bucketActive(name)
-    {
+    function renameBucket(
+        string memory name,
+        string memory newBucketName
+    ) external onlySpaceOwner bucketActive(name) {
         allBuckets[newBucketName] = BucketContainer(
             allBuckets[name].bucket,
             allBuckets[name].active,
@@ -131,8 +121,9 @@ contract Space is PaymentAdapter, Initializable {
         );
         allBucketNames.push(newBucketName);
         _removeBucketNameFromList(name);
+        address bucket = address(allBuckets[name].bucket);
         delete (allBuckets[name]);
-        emit Rename(name, newBucketName, msg.sender);
+        emit Rename(bucket, msg.sender);
     }
 
     function getAllBuckets() external view returns (BucketContainer[] memory) {
@@ -145,10 +136,9 @@ contract Space is PaymentAdapter, Initializable {
         return result;
     }
 
-    function _removeBucketNameFromList(string memory name)
-        private
-        bucketActive(name)
-    {
+    function _removeBucketNameFromList(
+        string memory name
+    ) private bucketActive(name) {
         int256 foundIndex = -1;
         for (uint256 i = 0; i < allBucketNames.length; i++) {
             if (keccak256(bytes(allBucketNames[i])) == keccak256(bytes(name))) {

@@ -1,13 +1,17 @@
 import { getAccountKeys } from "../helpers/keys.helper";
 import { expect } from "chai";
 import hre, { ethers } from "hardhat";
-import { BucketFactory } from "../../typechain-types";
+import {
+  BucketFactory,
+  ParticipantManagerFactory,
+} from "../../typechain-types";
 
 const { ACCOUNT_0_PUBLIC_KEY, ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } =
   getAccountKeys();
 
 describe("BucketFactory", () => {
   let bucketFactory: BucketFactory;
+  let participantManagerFactory: ParticipantManagerFactory;
 
   beforeEach(async () => {
     const Bucket = await hre.ethers.getContractFactory("Bucket");
@@ -22,20 +26,59 @@ describe("BucketFactory", () => {
     const PubKeyChecker = await ethers.getContractFactory("PubKeyChecker");
     const pubKeyChecker = await PubKeyChecker.deploy();
 
-    const BucketFactory = await ethers.getContractFactory("BucketFactory", {
-      libraries: {
-        InvitationChecker: invitationChecker.address,
-        PubKeyChecker: pubKeyChecker.address,
-      },
-    });
-    bucketFactory = await BucketFactory.deploy(bucket.address, element.address);
+    const CreditChecker = await hre.ethers.getContractFactory("CreditChecker");
+    const creditChecker = await CreditChecker.deploy();
+    const PaymentManager = await hre.ethers.getContractFactory(
+      "PaymentManager",
+      {
+        libraries: {
+          CreditChecker: await creditChecker.getAddress(),
+        },
+      }
+    );
+
+    const paymentManager = await PaymentManager.deploy(
+      1000000000000000,
+      100,
+      1000000000000
+    );
+
+    const ParticipantManager = await hre.ethers.getContractFactory(
+      "ParticipantManager",
+      {
+        libraries: {
+          InvitationChecker: await invitationChecker.getAddress(),
+          PubKeyChecker: await pubKeyChecker.getAddress(),
+        },
+      }
+    );
+    const participantManager = await ParticipantManager.deploy();
+    await participantManager.initialize(
+      "Peter Parker",
+      ACCOUNT_0_ADDRESS,
+      ACCOUNT_0_PUBLIC_KEY,
+      await paymentManager.getAddress()
+    );
+    const ParticipantManagerFactory = await ethers.getContractFactory(
+      "ParticipantManagerFactory"
+    );
+    participantManagerFactory = await ParticipantManagerFactory.deploy(
+      await participantManager.getAddress()
+    );
+
+    const BucketFactory = await ethers.getContractFactory("BucketFactory", {});
+    bucketFactory = await BucketFactory.deploy(
+      await bucket.getAddress(),
+      await element.getAddress(),
+      await participantManagerFactory.getAddress()
+    );
   });
 
   describe("Creating new Buckets", () => {
     it("fails if no registered space", async () => {
       await expect(
         bucketFactory.createBucket(
-          ethers.constants.AddressZero,
+          ethers.ZeroAddress,
           "Peter Parker",
           ACCOUNT_0_ADDRESS,
           ACCOUNT_0_PUBLIC_KEY
@@ -45,8 +88,11 @@ describe("BucketFactory", () => {
 
     it("works for registered space", async () => {
       await bucketFactory.registerSpace(ACCOUNT_0_ADDRESS);
+      await participantManagerFactory.registerBucketFactory(
+        await bucketFactory.getAddress()
+      );
       await bucketFactory.createBucket(
-        ethers.constants.AddressZero,
+        ethers.ZeroAddress,
         "Peter Parker",
         ACCOUNT_0_ADDRESS,
         ACCOUNT_0_PUBLIC_KEY

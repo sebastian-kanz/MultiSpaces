@@ -41,7 +41,7 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
         elemImpl = Element(addresses.elemImpl);
 
         require(!parentBucket.hashExists(hashes.meta), "Meta already exists");
-        require(!parentBucket.hashExists(hashes.data), "Data already exists");
+        // require(!parentBucket.hashExists(hashes.data), "Data already exists");
         require(
             !parentBucket.hashExists(hashes.container),
             "Container already exists"
@@ -66,10 +66,10 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
         redundancy = LibElement.RedundancyLevel.SINGLE;
     }
 
-    function update(LibElement.HashBundle memory hashes, address parent)
-        external
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
-    {
+    function update(
+        LibElement.HashBundle memory hashes,
+        address parent
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
         require(
             address(nextElement) == address(this),
             "Newer version already exists"
@@ -79,10 +79,10 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
             !parentBucket.hashExists(hashes.meta),
             "New meta already exists"
         );
-        require(
-            !parentBucket.hashExists(hashes.data),
-            "New data already exists"
-        );
+        // require(
+        //     !parentBucket.hashExists(hashes.data),
+        //     "New data already exists"
+        // );
         require(
             !parentBucket.hashExists(hashes.container),
             "New container already exists"
@@ -117,10 +117,9 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
         Bucket(parentBucket).notifyDelete(this, msg.sender);
     }
 
-    function setParent(address parent)
-        external
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
-    {
+    function setParent(
+        address parent
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
         parentElement = parent;
         Bucket(parentBucket).notifyUpdateParent(this, msg.sender);
     }
@@ -137,6 +136,7 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
             holdersCount++;
         }
         holders[msg.sender] = true;
+        emit LibElement.HoldersCountChanged(address(this), holdersCount);
     }
 
     function announceRemoval()
@@ -147,12 +147,12 @@ contract Element is IElement, Initializable, ParticipantManagerAdapter {
             holdersCount--;
         }
         holders[msg.sender] = false;
+        emit LibElement.HoldersCountChanged(address(this), holdersCount);
     }
 
-    function setRedundancyLevel(LibElement.RedundancyLevel level)
-        external
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
-    {
+    function setRedundancyLevel(
+        LibElement.RedundancyLevel level
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
         _setRedundancyLevel(level);
     }
 

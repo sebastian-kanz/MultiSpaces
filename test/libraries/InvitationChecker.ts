@@ -9,8 +9,8 @@ describe("InvitationChecker", () => {
     it("identifies correct signature", async () => {
       const text = "This is a random invitation code";
 
-      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
-      const hash = hre.ethers.utils.arrayify(stringHash);
+      const stringHash = hre.ethers.solidityPackedKeccak256(["string"], [text]);
+      const hash = hre.ethers.getBytes(stringHash);
 
       // prefixes automatically with \x19Ethereum Signed Message:\n32
       const signResult = await (
@@ -33,8 +33,8 @@ describe("InvitationChecker", () => {
     it("fails for invalid invitation code", async () => {
       const text = "This is a random invitation code";
 
-      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
-      const hash = hre.ethers.utils.arrayify(stringHash);
+      const stringHash = hre.ethers.solidityPackedKeccak256(["string"], [text]);
+      const hash = hre.ethers.getBytes(stringHash);
 
       // prefixes automatically with \x19Ethereum Signed Message:\n32
       const signResult = await (
@@ -57,8 +57,8 @@ describe("InvitationChecker", () => {
     it("identifies invalid signer", async () => {
       const text = "This is a random invitation code";
 
-      const stringHash = hre.ethers.utils.solidityKeccak256(["string"], [text]);
-      const hash = hre.ethers.utils.arrayify(stringHash);
+      const stringHash = hre.ethers.solidityPackedKeccak256(["string"], [text]);
+      const hash = hre.ethers.getBytes(stringHash);
 
       // prefixes automatically with \x19Ethereum Signed Message:\n32
       const signResult = await (

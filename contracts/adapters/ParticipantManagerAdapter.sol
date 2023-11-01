@@ -26,58 +26,70 @@ abstract contract ParticipantManagerAdapter {
         }
     }
 
-    // function _onlyRoleDelegated(bytes32 role, address delegator) internal view {
-    //     if (!participantManager.hasRoleDelegated(role, delegator, msg.sender)) {
-    //         revert(
-    //             string(
-    //                 abi.encodePacked(
-    //                     "AccessControl: account ",
-    //                     Strings.toHexString(uint160(msg.sender), 20),
-    //                     " is unauthorized"
-    //                 )
-    //             )
-    //         );
-    //     }
-    // }
-
     modifier onlyRole(bytes32 role) {
         _onlyRole(role);
         _;
     }
 
-    // modifier onlyRoleDelegated(bytes32 role, address issuer) {
-    //     _onlyRoleDelegated(role, issuer);
-    //     _;
-    // }
-
-    // function delegatedSender(address delegator)
-    //     internal
-    //     view
-    //     returns (address)
-    // {
-    //     return participantManager.delegatedSender(delegator, msg.sender);
-    // }
-
     function participantCount() internal view returns (uint256) {
         return participantManager.participantCount();
     }
 
-    function _redeemParticipationCode(
-        string memory name,
-        address inviter,
-        address invitee,
-        bytes memory signature,
-        string memory randomCode,
-        bytes memory pubKey
+    // function _redeemParticipationCode(
+    //     string memory name,
+    //     address inviter,
+    //     address invitee,
+    //     bytes memory signature,
+    //     string memory randomCode,
+    //     bytes memory pubKey
+    // ) internal {
+    //     participantManager.redeemParticipationCode(
+    //         name,
+    //         inviter,
+    //         invitee,
+    //         signature,
+    //         randomCode,
+    //         pubKey
+    //     );
+    // }
+
+    function _addParticipation(
+        string memory newParticipantName,
+        address newParticipantAdr,
+        bytes memory newParticipantPubKey
     ) internal {
-        participantManager.redeemParticipationCode(
-            name,
-            inviter,
-            invitee,
-            signature,
-            randomCode,
-            pubKey
+        participantManager.addParticipation(
+            newParticipantName,
+            newParticipantAdr,
+            newParticipantPubKey
         );
+    }
+
+    function _requestParticipation(
+        string memory name,
+        address requestor,
+        bytes memory pubKey,
+        string memory deviceName,
+        address device,
+        bytes memory devicePubKey,
+        bytes memory signature
+    ) internal {
+        participantManager.requestParticipation(
+            name,
+            requestor,
+            pubKey,
+            deviceName,
+            device,
+            devicePubKey,
+            signature
+        );
+    }
+
+    function _acceptParticipation(
+        address requestor,
+        address acceptor
+    ) internal {
+        participantManager.acceptParticipation(requestor, acceptor);
     }
 
     function _removeParticipation(address participant) internal {

@@ -65,21 +65,23 @@ contract Bucket is
         minElementRedundancy = LibElement.RedundancyLevel.SINGLE;
     }
 
-    function addKeys(string[] memory newHashes, address[] memory participants)
-        external
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
-    {
-        require(newHashes.length == participantCount(), "Invalid input");
+    function addKeys(
+        string[] memory keys,
+        address[] memory participants,
+        string memory keyCreatorPubKey
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
+        require(keys.length == participantCount(), "Invalid input");
         require(participants.length == participantCount(), "Invalid input");
-        _addKeys(newHashes, participants);
+        _addKeys(keys, participants, keyCreatorPubKey);
     }
 
     function setKeyForParticipant(
-        string memory keyHash,
+        string memory key,
         address participant,
+        string memory keyCreatorPubKey,
         uint256 blockNumber
     ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
-        _setKeyForParticipant(keyHash, participant, blockNumber);
+        _setKeyForParticipant(key, participant, keyCreatorPubKey, blockNumber);
     }
 
     // @notice Create multiple elements at once
@@ -149,13 +151,7 @@ contract Bucket is
     }
 
     /// @notice Get all elements
-    function getAll()
-        external
-        view
-        override
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
-        returns (address[] memory)
-    {
+    function getAll() external view override returns (address[] memory) {
         return allElements;
     }
 
@@ -164,27 +160,69 @@ contract Bucket is
         external
         view
         override
-        onlyRole(LibParticipant.PARTICIPANT_ROLE)
         returns (LibElement.Operation[] memory)
     {
         return history;
     }
 
-    function redeemParticipationCode(
-        string memory name,
-        address inviter,
-        bytes memory signature,
-        string memory randomCode,
-        bytes memory pubKey
-    ) external payable charge(IPaymentManager.PayableAction.ADD_PARTICIPANT) {
-        _redeemParticipationCode(
-            name,
-            inviter,
-            msg.sender,
-            signature,
-            randomCode,
-            pubKey
+    // function redeemParticipationCode(
+    //     string memory name,
+    //     address inviter,
+    //     bytes memory signature,
+    //     string memory randomCode,
+    //     bytes memory pubKey
+    // ) external payable charge(IPaymentManager.PayableAction.ADD_PARTICIPANT) {
+    //     _redeemParticipationCode(
+    //         name,
+    //         inviter,
+    //         msg.sender,
+    //         signature,
+    //         randomCode,
+    //         pubKey
+    //     );
+    // }
+
+    function addParticipation(
+        string memory newParticipantName,
+        address newParticipantAdr,
+        bytes memory newParticipantPubKey
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
+        participantManager.addParticipation(
+            newParticipantName,
+            newParticipantAdr,
+            newParticipantPubKey
         );
+    }
+
+    function requestParticipation(
+        string memory name,
+        address requestor,
+        bytes memory pubKey,
+        string memory deviceName,
+        address device,
+        bytes memory devicePubKey,
+        bytes memory signature
+    ) external {
+        _requestParticipation(
+            name,
+            requestor,
+            pubKey,
+            deviceName,
+            device,
+            devicePubKey,
+            signature
+        );
+    }
+
+    function acceptParticipation(
+        address requestor
+    )
+        external
+        payable
+        charge(IPaymentManager.PayableAction.ADD_PARTICIPANT)
+        onlyRole(LibParticipant.PARTICIPANT_ROLE)
+    {
+        _acceptParticipation(requestor, msg.sender);
     }
 
     function removeParticipation()
@@ -236,7 +274,10 @@ contract Bucket is
         registeredElements[address(elem)] = true;
     }
 
-    function notifyUpdate(Element elem, address sender)
+    function notifyUpdate(
+        Element elem,
+        address sender
+    )
         external
         onlyRegisteredElement
         keyAvailable(block.number, sender)
@@ -253,10 +294,19 @@ contract Bucket is
         emit Update(msg.sender, address(elem), block.number, sender);
     }
 
-    function notifyUpdateParent(Element elem, address sender)
-        external
-        onlyRegisteredElement
-    {
+    function updateParent(
+        address elemAdr,
+        address parentAdr
+    ) external onlyRole(LibParticipant.PARTICIPANT_ROLE) {
+        require(registeredElements[elemAdr], "Element does not exist!");
+        Element elem = Element(elemAdr);
+        elem.setParent(parentAdr);
+    }
+
+    function notifyUpdateParent(
+        Element elem,
+        address sender
+    ) external onlyRegisteredElement {
         history.push(
             LibElement.Operation(
                 address(elem),
@@ -272,10 +322,10 @@ contract Bucket is
         );
     }
 
-    function notifyDelete(Element elem, address sender)
-        external
-        onlyRegisteredElement
-    {
+    function notifyDelete(
+        Element elem,
+        address sender
+    ) external onlyRegisteredElement {
         hashExists[elem.metaHash()] = false;
         hashExists[elem.dataHash()] = false;
         hashExists[elem.containerHash()] = false;
@@ -289,17 +339,15 @@ contract Bucket is
         emit Delete(address(elem), block.number, sender);
     }
 
-    function setElementImplementation(address impl)
-        external
-        onlyRole(LibParticipant.OWNER_ROLE)
-    {
+    function setElementImplementation(
+        address impl
+    ) external onlyRole(LibParticipant.OWNER_ROLE) {
         elementImpl = impl;
     }
 
-    function setMinElementRedundancy(LibElement.RedundancyLevel level)
-        external
-        onlyRole(LibParticipant.OWNER_ROLE)
-    {
+    function setMinElementRedundancy(
+        LibElement.RedundancyLevel level
+    ) external onlyRole(LibParticipant.OWNER_ROLE) {
         minElementRedundancy = level;
     }
 }

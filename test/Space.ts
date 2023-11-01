@@ -22,22 +22,11 @@ describe("Space", () => {
     const CreditChecker = await hre.ethers.getContractFactory("CreditChecker");
     const creditChecker = await CreditChecker.deploy();
 
-    const BucketFactory = await ethers.getContractFactory("BucketFactory", {
-      libraries: {
-        InvitationChecker: invitationChecker.address,
-        PubKeyChecker: pubKeyChecker.address,
-      },
-    });
-    const bucketFactory = await BucketFactory.deploy(
-      bucket.address,
-      element.address
-    );
-
     const PaymentManager = await hre.ethers.getContractFactory(
       "PaymentManager",
       {
         libraries: {
-          CreditChecker: creditChecker.address,
+          CreditChecker: await creditChecker.getAddress(),
         },
       }
     );
@@ -48,9 +37,42 @@ describe("Space", () => {
       1000000000000
     );
 
+    const ParticipantManager = await hre.ethers.getContractFactory(
+      "ParticipantManager",
+      {
+        libraries: {
+          InvitationChecker: await invitationChecker.getAddress(),
+          PubKeyChecker: await pubKeyChecker.getAddress(),
+        },
+      }
+    );
+    const participantManager = await ParticipantManager.deploy();
+    await participantManager.initialize(
+      "Peter Parker",
+      ACCOUNT_0_ADDRESS,
+      ACCOUNT_0_PUBLIC_KEY,
+      await paymentManager.getAddress()
+    );
+    const ParticipantManagerFactory = await ethers.getContractFactory(
+      "ParticipantManagerFactory"
+    );
+    const participantManagerFactory = await ParticipantManagerFactory.deploy(
+      await participantManager.getAddress()
+    );
+
+    const BucketFactory = await ethers.getContractFactory("BucketFactory", {});
+    const bucketFactory = await BucketFactory.deploy(
+      await bucket.getAddress(),
+      await element.getAddress(),
+      await participantManagerFactory.getAddress()
+    );
+    await participantManagerFactory.registerBucketFactory(
+      await bucketFactory.getAddress()
+    );
+
     const Space = await ethers.getContractFactory("Space", {
       libraries: {
-        PubKeyChecker: pubKeyChecker.address,
+        PubKeyChecker: await pubKeyChecker.getAddress(),
       },
     });
 
@@ -59,11 +81,11 @@ describe("Space", () => {
       ACCOUNT_0_ADDRESS,
       "Peter Parker",
       ACCOUNT_0_PUBLIC_KEY,
-      bucketFactory.address,
-      paymentManager.address,
+      await bucketFactory.getAddress(),
+      await paymentManager.getAddress(),
       { value: 1000000000000000 }
     );
-    await bucketFactory.registerSpace(space.address);
+    await bucketFactory.registerSpace(await space.getAddress());
     return space;
   };
   describe("Creating a new Space", () => {
@@ -87,27 +109,17 @@ describe("Space", () => {
       const invitationChecker = await InvitationChecker.deploy();
       const PubKeyChecker = await ethers.getContractFactory("PubKeyChecker");
       const pubKeyChecker = await PubKeyChecker.deploy();
+
       const CreditChecker = await hre.ethers.getContractFactory(
         "CreditChecker"
       );
       const creditChecker = await CreditChecker.deploy();
 
-      const BucketFactory = await ethers.getContractFactory("BucketFactory", {
-        libraries: {
-          InvitationChecker: invitationChecker.address,
-          PubKeyChecker: pubKeyChecker.address,
-        },
-      });
-      const bucketFactory = await BucketFactory.deploy(
-        bucket.address,
-        element.address
-      );
-
       const PaymentManager = await hre.ethers.getContractFactory(
         "PaymentManager",
         {
           libraries: {
-            CreditChecker: creditChecker.address,
+            CreditChecker: await creditChecker.getAddress(),
           },
         }
       );
@@ -118,9 +130,42 @@ describe("Space", () => {
         1000000000000
       );
 
+      const ParticipantManager = await hre.ethers.getContractFactory(
+        "ParticipantManager",
+        {
+          libraries: {
+            InvitationChecker: await invitationChecker.getAddress(),
+            PubKeyChecker: await pubKeyChecker.getAddress(),
+          },
+        }
+      );
+      const participantManager = await ParticipantManager.deploy();
+      await participantManager.initialize(
+        "Peter Parker",
+        ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
+        await paymentManager.getAddress()
+      );
+      const ParticipantManagerFactory = await ethers.getContractFactory(
+        "ParticipantManagerFactory"
+      );
+      const participantManagerFactory = await ParticipantManagerFactory.deploy(
+        await participantManager.getAddress()
+      );
+
+      const BucketFactory = await ethers.getContractFactory(
+        "BucketFactory",
+        {}
+      );
+      const bucketFactory = await BucketFactory.deploy(
+        await bucket.getAddress(),
+        await element.getAddress(),
+        await participantManagerFactory.getAddress()
+      );
+
       const Space = await ethers.getContractFactory("Space", {
         libraries: {
-          PubKeyChecker: pubKeyChecker.address,
+          PubKeyChecker: await pubKeyChecker.getAddress(),
         },
       });
 
@@ -130,8 +175,8 @@ describe("Space", () => {
           ACCOUNT_0_ADDRESS,
           "Peter Parker",
           ACCOUNT_0_PUBLIC_KEY,
-          bucketFactory.address,
-          paymentManager.address,
+          await bucketFactory.getAddress(),
+          await paymentManager.getAddress(),
           { value: 100000000000000 }
         )
       ).to.be.reverted;
@@ -143,7 +188,7 @@ describe("Space", () => {
       const instance = await createNewSpace();
       await instance.addBucket("Bucket1", { value: 1000000000000000 });
       const bucket = await instance.getAllBuckets();
-      expect(bucket[0].bucket).not.equals(ethers.constants.AddressZero);
+      expect(bucket[0].bucket).not.equals(ethers.ZeroAddress);
       expect(await instance.allBucketNames(0)).equals("Bucket1");
     });
 
@@ -258,8 +303,8 @@ describe("Space", () => {
       expect(receipt)
         .to.emit(instance, "Rename")
         .withArgs(
-          ethers.utils.id("Bucket1"),
-          ethers.utils.id("Bucket_01"),
+          ethers.id("Bucket1"),
+          ethers.id("Bucket_01"),
           ACCOUNT_0_ADDRESS
         );
     });

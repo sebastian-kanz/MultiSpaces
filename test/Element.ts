@@ -8,12 +8,8 @@ import {
   PaymentManager,
 } from "../typechain-types";
 
-const {
-  ACCOUNT_0_PUBLIC_KEY,
-  ACCOUNT_0_ADDRESS,
-  ACCOUNT_1_ADDRESS,
-  ACCOUNT_1_PUBLIC_KEY,
-} = getAccountKeys();
+const { ACCOUNT_0_PUBLIC_KEY, ACCOUNT_0_ADDRESS, ACCOUNT_1_ADDRESS } =
+  getAccountKeys();
 
 describe("Element", () => {
   let participantManager: ParticipantManager;
@@ -37,7 +33,7 @@ describe("Element", () => {
       "PaymentManager",
       {
         libraries: {
-          CreditChecker: creditChecker.address,
+          CreditChecker: await creditChecker.getAddress(),
         },
       }
     );
@@ -52,17 +48,19 @@ describe("Element", () => {
       "ParticipantManager",
       {
         libraries: {
-          InvitationChecker: invitationChecker.address,
-          PubKeyChecker: pubKeyChecker.address,
+          InvitationChecker: await invitationChecker.getAddress(),
+          PubKeyChecker: await pubKeyChecker.getAddress(),
         },
       }
     );
 
-    participantManager = await ParticipantManager.deploy(
+    participantManager = await ParticipantManager.deploy();
+
+    await participantManager.initialize(
       "Peter Parker",
       ACCOUNT_0_ADDRESS,
       ACCOUNT_0_PUBLIC_KEY,
-      paymentManager.address
+      await paymentManager.getAddress()
     );
 
     const Bucket = await hre.ethers.getContractFactory("BucketMockElem");
@@ -72,24 +70,24 @@ describe("Element", () => {
     element = await Element.deploy();
     const elemImpl = await Element.deploy();
     bucket.initialize(
-      paymentManager.address,
-      participantManager.address,
-      elemImpl.address
+      await paymentManager.getAddress(),
+      await participantManager.getAddress(),
+      await elemImpl.getAddress()
     );
   });
 
   const createElement = async () => {
     const Element = await hre.ethers.getContractFactory("Element");
     const instance = await Element.deploy();
-    await bucket.mockRegisterElement(instance.address);
+    await bucket.mockRegisterElement(await instance.getAddress());
     await instance.initialize(
       {
         creator: ACCOUNT_0_ADDRESS,
-        participantManager: participantManager.address,
-        parent: ethers.constants.AddressZero,
-        previous: ethers.constants.AddressZero,
-        bucket: bucket.address,
-        elemImpl: element.address,
+        participantManager: await participantManager.getAddress(),
+        parent: ethers.ZeroAddress,
+        previous: ethers.ZeroAddress,
+        bucket: await bucket.getAddress(),
+        elemImpl: await element.getAddress(),
       },
       { meta: "meta", data: "data", container: "container" },
       0,
@@ -102,40 +100,42 @@ describe("Element", () => {
     it("sets all data correctly", async () => {
       const instance = await createElement();
       const meta = await instance.metaHash();
-      expect(meta === "meta", "Wrong meta");
+      expect(meta, "Wrong meta").to.eq("meta");
       const data = await instance.dataHash();
-      expect(data === "data", "Wrong data");
+      expect(data, "Wrong data").to.eq("data");
       const container = await instance.containerHash();
-      expect(container === "container", "Wrong container");
+      expect(container, "Wrong container").to.eq("container");
       const contentType = await instance.contentType();
-      expect(contentType.eq(0), "Wrong contentType");
+      expect(Number(contentType), "Wrong contentType").to.eq(0);
       const creator = await instance.creator();
-      expect(creator === ACCOUNT_0_ADDRESS, "Wrong creator");
+      expect(creator, "Wrong creator").to.eq(ACCOUNT_0_ADDRESS);
       const parent = await instance.parentElement();
-      expect(parent === ethers.constants.AddressZero, "Wrong parent");
+      expect(parent, "Wrong parent").to.eq(ethers.ZeroAddress);
       const previous = await instance.previousElement();
-      expect(previous === ethers.constants.AddressZero, "Wrong previous");
+      expect(previous, "Wrong previous").to.eq(ethers.ZeroAddress);
       const next = await instance.nextElement();
-      expect(next === instance.address, "Wrong next");
+      expect(next, "Wrong next").to.eq(await instance.getAddress());
       const parentBucket = await instance.parentBucket();
-      expect(parentBucket === bucket.address, "Wrong parentBucket");
+      expect(parentBucket, "Wrong parentBucket").to.eq(
+        await bucket.getAddress()
+      );
       const elemImpl = await instance.elemImpl();
-      expect(elemImpl === element.address, "Wrong elemImpl");
+      expect(elemImpl, "Wrong elemImpl").to.eq(await element.getAddress());
 
       const holdersCount = await instance.holdersCount();
-      expect(holdersCount.eq(1), "Wrong holdersCount");
+      expect(Number(holdersCount), "Wrong holdersCount").to.eq(1);
 
       const redundancy = await instance.redundancy();
-      expect(redundancy === 1, "Wrong redundancy");
+      expect(Number(redundancy), "Wrong redundancy").to.eq(1);
       const minRedundancy = await instance.minRedundancy();
-      expect(minRedundancy === 0, "Wrong minRedundancy");
+      expect(Number(minRedundancy), "Wrong minRedundancy").to.eq(0);
     });
 
     it("notifies the bucket of the creation", async () => {
       const instance = await createElement();
       const history = await bucket.history(0);
-      expect(history[0] === instance.address, "Wrong element");
-      expect(history[1] === 0, "Wrong operation type");
+      expect(history[0], "Wrong element").to.eq(await instance.getAddress());
+      expect(Number(history[1]), "Wrong operation type").to.eq(0);
     });
   });
 
@@ -148,7 +148,7 @@ describe("Element", () => {
           .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
           .update(
             { meta: "meta", data: "data", container: "container" },
-            ethers.constants.AddressZero
+            ethers.ZeroAddress
           )
       ).to.be.revertedWith(new RegExp(/is missing role/));
     });
@@ -159,35 +159,43 @@ describe("Element", () => {
       await expect(
         instance.update(
           { meta: "meta2", data: "data2", container: "container2" },
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       ).to.be.revertedWith(new RegExp(/No key available!/));
     });
 
     it("only works if not already updated", async () => {
       const instance = await createElement();
-      await bucket.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await bucket.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
 
       await instance.update(
         { meta: "meta2", data: "data2", container: "container2" },
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       );
 
       await expect(
         instance.update(
           { meta: "meta3", data: "data3", container: "container3" },
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       ).to.be.revertedWith(new RegExp(/Newer version already exists/));
     });
 
     it("only works if new hashes do not yet exist", async () => {
-      await bucket.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await bucket.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await bucket.createElements(
         ["meta"],
         ["data"],
         ["container"],
-        [ethers.constants.AddressZero],
+        [ethers.ZeroAddress],
         0
       );
       const adr = await bucket.allElements(0);
@@ -196,62 +204,70 @@ describe("Element", () => {
       await expect(
         instance.update(
           { meta: "meta", data: "data", container: "container" },
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       ).to.be.revertedWith(new RegExp(/New meta already exists/));
       await expect(
         instance.update(
-          { meta: "meta2", data: "data", container: "container" },
-          ethers.constants.AddressZero
-        )
-      ).to.be.revertedWith(new RegExp(/New data already exists/));
-      await expect(
-        instance.update(
           { meta: "meta2", data: "data2", container: "container" },
-          ethers.constants.AddressZero
+          ethers.ZeroAddress
         )
       ).to.be.revertedWith(new RegExp(/New container already exists/));
     });
 
     it("notifies the bucket of the creation of the new element", async () => {
       const instance = await createElement();
-      await bucket.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await bucket.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
 
       await instance.update(
         { meta: "meta2", data: "data2", container: "container2" },
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       );
 
       const history = await bucket.history(1);
-      expect(history[0] != instance.address, "Wrong element");
-      expect(history[1] === 0, "Wrong operation type");
+      expect(history[0], "Wrong element").to.not.eq(
+        await instance.getAddress()
+      );
+      expect(Number(history[1]), "Wrong operation type").to.eq(0);
       const history2 = await bucket.history(2);
-      expect(history2[0] != instance.address, "Wrong element");
-      expect(history2[1] === 1, "Wrong operation type");
+      expect(history2[0], "Wrong element").to.not.eq(
+        await instance.getAddress()
+      );
+      expect(Number(history2[1]), "Wrong operation type").to.eq(1);
     });
 
     it("set previous <-> next relationship correctly", async () => {
-      await bucket.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await bucket.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await bucket.createElements(
         ["meta"],
         ["data"],
         ["container"],
-        [ethers.constants.AddressZero],
+        [ethers.ZeroAddress],
         0
       );
       const adr = await bucket.allElements(0);
       const instance = await hre.ethers.getContractAt("Element", adr);
       await instance.update(
         { meta: "meta2", data: "data2", container: "container2" },
-        ethers.constants.AddressZero
+        ethers.ZeroAddress
       );
 
       const next = await instance.nextElement();
       const adr2 = await bucket.allElements(1);
       const instance2 = await hre.ethers.getContractAt("Element", adr2);
       const previous = await instance2.previousElement();
-      expect(next === instance2.address, "Wrong next element");
-      expect(previous === instance.address, "Wrong previous element");
+      expect(next, "Wrong next element").to.eq(await instance2.getAddress());
+      expect(previous, "Wrong previous element").to.eq(
+        await instance.getAddress()
+      );
     });
   });
 
@@ -278,8 +294,8 @@ describe("Element", () => {
       await instance.remove();
 
       const history = await bucket.history(1);
-      expect(history[0] === instance.address, "Wrong element");
-      expect(history[1] === 3, "Wrong operation type");
+      expect(history[0], "Wrong element").to.eq(await instance.getAddress());
+      expect(Number(history[1]), "Wrong operation type").to.eq(3);
     });
   });
 
@@ -289,17 +305,17 @@ describe("Element", () => {
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-          .setParent(ethers.constants.AddressZero)
+          .setParent(ethers.ZeroAddress)
       ).to.be.revertedWith(new RegExp(/is missing role/));
     });
 
     it("notifies the bucket of the update", async () => {
       const instance = await createElement();
-      await instance.setParent(ethers.constants.AddressZero);
+      await instance.setParent(ethers.ZeroAddress);
 
       const history = await bucket.history(1);
-      expect(history[0] === instance.address, "Wrong element");
-      expect(history[1] === 2, "Wrong operation type");
+      expect(history[0], "Wrong element").to.eq(await instance.getAddress());
+      expect(Number(history[1]), "Wrong operation type").to.eq(2);
     });
   });
 
@@ -309,7 +325,7 @@ describe("Element", () => {
       const receipt = await instance.requestData();
       expect(receipt)
         .to.emit(instance, "Request")
-        .withArgs(instance.address, ACCOUNT_0_ADDRESS);
+        .withArgs(await instance.getAddress(), ACCOUNT_0_ADDRESS);
     });
   });
 
@@ -327,7 +343,15 @@ describe("Element", () => {
       const instance = await createElement();
       await instance.announceHolding();
       const holding = await instance.holders(ACCOUNT_0_ADDRESS);
-      expect(holding, "Wrong holding");
+      expect(holding, "Wrong holding").to.be.true;
+    });
+
+    it("emits event", async () => {
+      const instance = await createElement();
+      const receipt = await instance.announceHolding();
+      expect(receipt)
+        .to.emit(instance, "HoldersCountChanged")
+        .withArgs(await instance.getAddress(), 1);
     });
   });
 
@@ -345,7 +369,16 @@ describe("Element", () => {
       const instance = await createElement();
       await instance.announceRemoval();
       const holding = await instance.holders(ACCOUNT_0_ADDRESS);
-      expect(!holding, "Wrong holding");
+      expect(holding, "Wrong holding").to.be.false;
+    });
+
+    it("emits event", async () => {
+      const instance = await createElement();
+      await instance.announceHolding();
+      const receipt = await instance.announceRemoval();
+      expect(receipt)
+        .to.emit(instance, "HoldersCountChanged")
+        .withArgs(await instance.getAddress(), 0);
     });
   });
 
@@ -363,7 +396,7 @@ describe("Element", () => {
       const instance = await createElement();
       await instance.setRedundancyLevel(2);
       const level = await instance.redundancy();
-      expect(level === 2, "Wrong level");
+      expect(Number(level), "Wrong level").to.eq(2);
     });
   });
 });

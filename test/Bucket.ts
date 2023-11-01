@@ -37,7 +37,7 @@ describe("Bucket", () => {
       "PaymentManager",
       {
         libraries: {
-          CreditChecker: creditChecker.address,
+          CreditChecker: await creditChecker.getAddress(),
         },
       }
     );
@@ -52,17 +52,19 @@ describe("Bucket", () => {
       "ParticipantManager",
       {
         libraries: {
-          InvitationChecker: invitationChecker.address,
-          PubKeyChecker: pubKeyChecker.address,
+          InvitationChecker: await invitationChecker.getAddress(),
+          PubKeyChecker: await pubKeyChecker.getAddress(),
         },
       }
     );
 
-    participantManager = await ParticipantManager.deploy(
+    participantManager = await ParticipantManager.deploy();
+
+    await participantManager.initialize(
       "Peter Parker",
       ACCOUNT_0_ADDRESS,
       ACCOUNT_0_PUBLIC_KEY,
-      paymentManager.address
+      await paymentManager.getAddress()
     );
 
     const Element = await hre.ethers.getContractFactory("Element");
@@ -80,22 +82,22 @@ describe("Bucket", () => {
       instance = await Bucket.deploy();
     }
     await instance.initialize(
-      paymentManager.address,
-      participantManager.address,
-      element.address
+      await paymentManager.getAddress(),
+      await participantManager.getAddress(),
+      await element.getAddress()
     );
 
     await participantManager.grantRole(
-      hre.ethers.utils.hexZeroPad("0x00", 32),
-      instance.address
+      hre.ethers.zeroPadValue("0x00", 32),
+      await instance.getAddress()
     );
     return instance;
   };
 
   const getParticipationCodePayload = async () => {
     const randomCode = "This is a random invitation code";
-    const hash = hre.ethers.utils.arrayify(
-      hre.ethers.utils.solidityKeccak256(["string"], [randomCode])
+    const hash = hre.ethers.getBytes(
+      hre.ethers.solidityPackedKeccak256(["string"], [randomCode])
     );
 
     // prefixes automatically with \x19Ethereum Signed Message:\n32
@@ -113,13 +115,13 @@ describe("Bucket", () => {
   describe("Creating a bucket", () => {
     it("Works as expected", async () => {
       const instance = await createNewBucket();
-      const expectedBlockNumber = instance.deployTransaction.blockNumber ?? -1;
+      const expectedBlockNumber =
+        instance.deploymentTransaction()?.blockNumber ?? -1;
       const genesis = await instance.GENESIS();
       const minRedundancy = await instance.minElementRedundancy();
       expect(minRedundancy).to.equal(1, "False initial minimal redundancy!");
-      expect(
-        genesis.sub(1).eq(expectedBlockNumber),
-        "False genesis block number!"
+      expect(Number(genesis) - 1, "False genesis block number!").to.eq(
+        Number(expectedBlockNumber)
       );
     });
   });
@@ -146,11 +148,11 @@ describe("Bucket", () => {
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-          .addKeys(["key123"], [ACCOUNT_1_ADDRESS])
+          .addKeys(["key123"], [ACCOUNT_1_ADDRESS], ACCOUNT_0_PUBLIC_KEY)
       ).to.be.revertedWith(new RegExp(/is missing role/));
       await instance
         .connect(await hre.ethers.getSigner(ACCOUNT_0_ADDRESS))
-        .addKeys(["key123"], [ACCOUNT_1_ADDRESS]);
+        .addKeys(["key123"], [ACCOUNT_1_ADDRESS], ACCOUNT_0_PUBLIC_KEY);
     });
 
     it("are checked on adding", async () => {
@@ -158,77 +160,88 @@ describe("Bucket", () => {
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_0_ADDRESS))
-          .addKeys([], [ACCOUNT_1_ADDRESS])
+          .addKeys([], [ACCOUNT_1_ADDRESS], ACCOUNT_0_PUBLIC_KEY)
       ).to.be.revertedWith("Invalid input");
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_0_ADDRESS))
-          .addKeys(["key123"], [])
+          .addKeys(["key123"], [], ACCOUNT_0_PUBLIC_KEY)
       ).to.be.revertedWith("Invalid input");
     });
 
     it("can be read per participant", async () => {
       const instance = await createNewBucket();
-      const result = await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
-      const blockNumber = result.blockNumber ?? -1;
-      const epoch = await instance.EPOCH();
-      const key = await instance.getKey(ACCOUNT_0_ADDRESS, blockNumber);
-      // minus 3 because of 0 index (0-99), the block in blockNumber is the one before the transaction creating the contract is mined and one block is already passed by
-      const key2 = await instance.getKey(
-        ACCOUNT_0_ADDRESS,
-        blockNumber + epoch.toNumber() - 3
+      const result = await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
       );
-      expect(key === "hash123", "Key invalid.");
-      expect(key === key2, "Key2 invalid.");
+      const blockNumber = result.blockNumber ?? -1;
+      const [key] = await instance.getKeyBundle(ACCOUNT_0_ADDRESS, blockNumber);
+      expect(key, "Key invalid.").to.eq("hash123");
     });
 
     it("can not be set before contract creation", async () => {
-      const rootNumber = await (
-        await hre.ethers.provider.getBlock("latest")
-      ).number;
+      const rootNumber =
+        (await hre.ethers.provider.getBlock("latest"))?.number ?? -1;
       const instance = await createNewBucket();
       await expect(
-        instance.setKeyForParticipant("keyHash", ACCOUNT_0_ADDRESS, rootNumber)
+        instance.setKeyForParticipant(
+          "keyHash",
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_0_PUBLIC_KEY,
+          rootNumber
+        )
       ).to.be.revertedWith("Block number before genesis.");
     });
 
     it("can be set per participant after contract creation", async () => {
       const instance = await createNewBucket();
-      const blockNumber = await (
-        await hre.ethers.provider.getBlock("latest")
-      ).number;
+      const blockNumber =
+        (await hre.ethers.provider.getBlock("latest"))?.number ?? -1;
       await instance.setKeyForParticipant(
         "keyHash",
         ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
         blockNumber
       );
     });
 
     it("can be set for participant only from a participant", async () => {
       const instance = await createNewBucket();
-      const blockNumber = await (
-        await hre.ethers.provider.getBlock("latest")
-      ).number;
+      const blockNumber =
+        (await hre.ethers.provider.getBlock("latest"))?.number ?? -1;
 
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-          .setKeyForParticipant("keyHash", ACCOUNT_0_ADDRESS, blockNumber)
+          .setKeyForParticipant(
+            "keyHash",
+            ACCOUNT_0_ADDRESS,
+            ACCOUNT_0_PUBLIC_KEY,
+            blockNumber
+          )
       ).to.be.revertedWith(new RegExp(/is missing role/));
     });
 
     it("can not be set if already available", async () => {
       const instance = await createNewBucket();
-      const blockNumber = await (
-        await hre.ethers.provider.getBlock("latest")
-      ).number;
+      const blockNumber =
+        (await hre.ethers.provider.getBlock("latest"))?.number ?? -1;
+
       await instance.setKeyForParticipant(
         "keyHash",
         ACCOUNT_0_ADDRESS,
+        ACCOUNT_0_PUBLIC_KEY,
         blockNumber
       );
       await expect(
-        instance.setKeyForParticipant("keyHash", ACCOUNT_0_ADDRESS, blockNumber)
+        instance.setKeyForParticipant(
+          "keyHash",
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_0_PUBLIC_KEY,
+          blockNumber
+        )
       ).to.be.revertedWith("Key already available!");
     });
 
@@ -237,7 +250,12 @@ describe("Bucket", () => {
       const blockNumber = 10000000;
 
       await expect(
-        instance.setKeyForParticipant("keyHash", ACCOUNT_0_ADDRESS, blockNumber)
+        instance.setKeyForParticipant(
+          "keyHash",
+          ACCOUNT_0_ADDRESS,
+          ACCOUNT_0_PUBLIC_KEY,
+          blockNumber
+        )
       ).to.be.revertedWith("Block time in future.");
     });
   });
@@ -258,54 +276,67 @@ describe("Bucket", () => {
       await expect(
         instance.createElements([], [], [], [], 0)
       ).to.be.revertedWith(new RegExp(/No key available!/));
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance.createElements(
         ["meta"],
         ["data"],
         ["container"],
-        [ethers.constants.AddressZero],
+        [ethers.ZeroAddress],
         0
       );
     });
 
     it("decreases limit of bucket and not the participant", async () => {
       const instance = await createNewBucket();
-      const balance = await paymentManager.callStatic.getLimit(
-        instance.address,
+      await paymentManager.initLimits(await instance.getAddress());
+      const balance = await paymentManager.getLimit(
+        await instance.getAddress(),
         0
       );
-      const balanceSender = await paymentManager.callStatic.getLimit(
-        ACCOUNT_0_ADDRESS,
-        0
+      expect(Number(balance), "Limit not yet initialized.").to.not.eq(0);
+      await paymentManager.initLimits(ACCOUNT_0_ADDRESS);
+      const balanceSender = await paymentManager.getLimit(ACCOUNT_0_ADDRESS, 0);
+      expect(Number(balanceSender), "Limit not yet initialized.").to.not.eq(0);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
       );
-      expect(!balance.eq(0), "Limit not yet initialized.");
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
       await instance.createElements(
         ["meta"],
         ["data"],
         ["container"],
-        [ethers.constants.AddressZero],
+        [ethers.ZeroAddress],
         0
       );
-      const newBalance = await paymentManager.callStatic.getLimit(
-        instance.address,
+      const newBalance = await paymentManager.getLimit(
+        await instance.getAddress(),
         0
       );
-      const newBalanceSender = await paymentManager.callStatic.getLimit(
+      const newBalanceSender = await paymentManager.getLimit(
         ACCOUNT_0_ADDRESS,
         0
       );
       const defaultBalance = await paymentManager.DEFAULT_LIMITS(0);
-      expect(defaultBalance.gt(newBalance), "Limit was not decreased.");
-      expect(
-        balanceSender.eq(newBalanceSender),
-        "Limit of sender was changed."
+      expect(Number(defaultBalance), "Limit was not decreased.").to.be.gt(
+        newBalance
+      );
+      expect(Number(balanceSender), "Limit of sender was changed.").to.eq(
+        Number(newBalanceSender)
       );
     });
 
     it("checks workload", async () => {
       const instance = await createNewBucket();
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
 
       await expect(
         instance.createElements(
@@ -373,7 +404,7 @@ describe("Bucket", () => {
           ],
           ["data"],
           ["container"],
-          [ethers.constants.AddressZero],
+          [ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Workload too high!/));
@@ -381,14 +412,18 @@ describe("Bucket", () => {
 
     it("checks element counts", async () => {
       const instance = await createNewBucket();
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
 
       await expect(
         instance.createElements(
           ["meta1", "meta2"],
           ["data1"],
           ["container1"],
-          [ethers.constants.AddressZero],
+          [ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Invalid data hashes length/));
@@ -398,7 +433,7 @@ describe("Bucket", () => {
           ["meta1", "meta2"],
           ["data1", "data2"],
           ["container1"],
-          [ethers.constants.AddressZero, ethers.constants.AddressZero],
+          [ethers.ZeroAddress, ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Invalid container hashes length/));
@@ -408,7 +443,7 @@ describe("Bucket", () => {
           ["meta1", "meta2"],
           ["data1", "data2"],
           ["container1", "container2"],
-          [ethers.constants.AddressZero],
+          [ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Invalid parents length/));
@@ -416,12 +451,16 @@ describe("Bucket", () => {
 
     it("does not override existing elements", async () => {
       const instance = await createNewBucket();
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance.createElements(
         ["metaParent"],
         ["dataParent"],
         ["containerParent"],
-        [ethers.constants.AddressZero],
+        [ethers.ZeroAddress],
         0
       );
       const parent = await instance.allElements(0);
@@ -438,7 +477,7 @@ describe("Bucket", () => {
           ["meta"],
           ["data"],
           ["container"],
-          [ethers.constants.AddressZero],
+          [ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Meta already exists/));
@@ -446,19 +485,9 @@ describe("Bucket", () => {
       await expect(
         instance.createElements(
           ["meta2"],
-          ["data"],
-          ["container"],
-          [ethers.constants.AddressZero],
-          0
-        )
-      ).to.be.revertedWith(new RegExp(/Data already exists/));
-
-      await expect(
-        instance.createElements(
-          ["meta2"],
           ["data2"],
           ["container"],
-          [ethers.constants.AddressZero],
+          [ethers.ZeroAddress],
           0
         )
       ).to.be.revertedWith(new RegExp(/Container already exists/));
@@ -466,14 +495,18 @@ describe("Bucket", () => {
 
     it("creates a new element for every input data set", async () => {
       const instance = await createNewBucket();
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance
         .connect(await hre.ethers.getSigner(ACCOUNT_0_ADDRESS))
         .createElements(
           ["meta1", "meta2"],
           ["data1", "data2"],
           ["container1", "container2"],
-          [ethers.constants.AddressZero, ethers.constants.AddressZero],
+          [ethers.ZeroAddress, ethers.ZeroAddress],
           0
         );
       const element0 = await instance.allElements(0);
@@ -483,14 +516,18 @@ describe("Bucket", () => {
 
     it("adds newly created elements to internal state", async () => {
       const instance = await createNewBucket();
-      await instance.addKeys(["hash123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["hash123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance
         .connect(await hre.ethers.getSigner(ACCOUNT_0_ADDRESS))
         .createElements(
           ["meta1", "meta2"],
           ["data1", "data2"],
           ["container1", "container2"],
-          [ethers.constants.AddressZero, ethers.constants.AddressZero],
+          [ethers.ZeroAddress, ethers.ZeroAddress],
           0
         );
       const elem1 = await instance.allElements(0);
@@ -510,26 +547,34 @@ describe("Bucket", () => {
       expect(hashExistsContainer2, "Missing hash");
 
       const history1 = await instance.history(0);
-      expect(history1[0] === elem1, "Wrong address");
-      expect(history1[1] === 0, "Wrong operation");
-      const history2 = await instance.history(0);
-      expect(history2[1] === 0, "Wrong operation");
+      expect(history1[0], "Wrong address").to.eq(elem1);
+      expect(Number(history1[1]), "Wrong operation").to.eq(0);
+
+      const history2 = await instance.history(1);
+      expect(history2[0], "Wrong address").to.eq(elem2);
+      expect(Number(history2[1]), "Wrong operation").to.eq(0);
     });
   });
 
-  describe("Redeeming participation code", () => {
+  describe("Requesting participation", () => {
     it("works as expected", async () => {
       const instance = await createNewBucket();
-      const payload = await getParticipationCodePayload();
+      const name = "requestor";
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(["string"], [name])
+      );
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_1_ADDRESS)
+      ).signMessage(hash);
       await instance
         .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-        .redeemParticipationCode(
-          "Paul",
-          payload.inviter,
-          payload.signature,
-          payload.randomCode,
-          ACCOUNT_1_PUBLIC_KEY,
-          { value: 1000000000000000 }
+        .requestParticipation(
+          name,
+          ACCOUNT_1_ADDRESS,
+          signResult,
+          ACCOUNT_1_PUBLIC_KEY
         );
       const participantManagerAddress = await instance.participantManager();
       const participantManager = await await hre.ethers.getContractAt(
@@ -537,7 +582,91 @@ describe("Bucket", () => {
         participantManagerAddress
       );
       const count = await participantManager.participantCount();
-      expect(count.eq(2), "Wrong participant count!");
+      expect(Number(count), "Wrong participant count!").to.eq(2);
+    });
+  });
+
+  describe("Accepting participation", () => {
+    it("works as expected", async () => {
+      const instance = await createNewBucket();
+      const name = "requestor";
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(["string"], [name])
+      );
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_1_ADDRESS)
+      ).signMessage(hash);
+      await instance.requestParticipation(
+        name,
+        ACCOUNT_1_ADDRESS,
+        signResult,
+        ACCOUNT_1_PUBLIC_KEY
+      );
+      await instance.acceptParticipation(ACCOUNT_1_ADDRESS, {
+        value: 1000000000000000,
+      });
+      const participantManagerAddress = await instance.participantManager();
+      const participantManager = await await hre.ethers.getContractAt(
+        "ParticipantManager",
+        participantManagerAddress
+      );
+      const hasRole = await participantManager.hasRole(
+        ethers.id("PARTICIPANT"),
+        ACCOUNT_1_ADDRESS
+      );
+      expect(hasRole).to.eq(true);
+    });
+
+    it("costs fee", async () => {
+      const instance = await createNewBucket();
+      const name = "requestor";
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(["string"], [name])
+      );
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_1_ADDRESS)
+      ).signMessage(hash);
+      await instance.requestParticipation(
+        name,
+        ACCOUNT_1_ADDRESS,
+        signResult,
+        ACCOUNT_1_PUBLIC_KEY
+      );
+
+      await expect(
+        instance.acceptParticipation(ACCOUNT_1_ADDRESS)
+      ).to.be.revertedWith(new RegExp(/Insufficient fee/));
+    });
+
+    it("only works for for particpants", async () => {
+      const instance = await createNewBucket();
+      const name = "requestor";
+      const hash = hre.ethers.getBytes(
+        hre.ethers.solidityPackedKeccak256(["string"], [name])
+      );
+
+      // prefixes automatically with \x19Ethereum Signed Message:\n32
+      const signResult = await (
+        await hre.ethers.getSigner(ACCOUNT_1_ADDRESS)
+      ).signMessage(hash);
+      await instance.requestParticipation(
+        name,
+        ACCOUNT_1_ADDRESS,
+        signResult,
+        ACCOUNT_1_PUBLIC_KEY
+      );
+
+      await expect(
+        instance
+          .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
+          .acceptParticipation(ACCOUNT_1_ADDRESS, {
+            value: 1000000000000000,
+          })
+      ).to.be.revertedWith(new RegExp(/is missing role/));
     });
   });
 
@@ -559,25 +688,6 @@ describe("Bucket", () => {
           .removeParticipation()
       ).to.be.revertedWith(new RegExp(/Last participant/));
     });
-
-    it("removes the sender as participant", async () => {
-      const instance = await createNewBucket();
-      const payload = await getParticipationCodePayload();
-      await instance
-        .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-        .redeemParticipationCode(
-          "Paul",
-          payload.inviter,
-          payload.signature,
-          payload.randomCode,
-          ACCOUNT_1_PUBLIC_KEY,
-          { value: 1000000000000000 }
-        );
-      await instance
-
-        .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-        .removeParticipation();
-    });
   });
 
   describe("Notifiying about a creation", () => {
@@ -595,8 +705,8 @@ describe("Bucket", () => {
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
       await instance.notifyCreation(ACCOUNT_0_ADDRESS);
       const history = await instance.history(0);
-      expect(history[0] === ACCOUNT_0_ADDRESS, "Wrong element address");
-      expect(history[1] === 0, "Wrong operation type");
+      expect(history[0], "Wrong element address").to.eq(ACCOUNT_0_ADDRESS);
+      expect(Number(history[1]), "Wrong operation type").to.eq(0);
     });
 
     it("emits event", async () => {
@@ -639,17 +749,25 @@ describe("Bucket", () => {
     it("adds element to history", async () => {
       const instance = await createNewBucket(true);
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS);
       const history = await instance.history(0);
-      expect(history[0] === ACCOUNT_0_ADDRESS, "Wrong element address");
-      expect(history[1] === 1, "Wrong operation type");
+      expect(history[0], "Wrong element address").to.eq(ACCOUNT_0_ADDRESS);
+      expect(Number(history[1]), "Wrong operation type").to.eq(1);
     });
 
     it("emits event", async () => {
       const instance = await createNewBucket(true);
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       const receipt = await instance.notifyUpdate(
         ACCOUNT_0_ADDRESS,
         ACCOUNT_0_ADDRESS
@@ -676,13 +794,19 @@ describe("Bucket", () => {
       const instance = await createNewBucket(true);
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
       const limitBefore = await paymentManager.DEFAULT_LIMITS(0);
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       await instance.notifyUpdate(ACCOUNT_0_ADDRESS, ACCOUNT_0_ADDRESS);
-      const limitAfter = await paymentManager.callStatic.getLimit(
-        instance.address,
+      const limitAfter = await paymentManager.getLimit(
+        await instance.getAddress(),
         0
       );
-      expect(limitAfter.lt(limitBefore), "Limit was not decreased.");
+      expect(Number(limitAfter), "Limit was not decreased.").to.be.lt(
+        Number(limitBefore)
+      );
     });
   });
 
@@ -701,11 +825,20 @@ describe("Bucket", () => {
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
       const Element = await hre.ethers.getContractFactory("Element");
       const elem = await Element.deploy();
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
-      await instance.notifyUpdateParent(elem.address, ACCOUNT_0_ADDRESS);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
+      await instance.notifyUpdateParent(
+        await elem.getAddress(),
+        ACCOUNT_0_ADDRESS
+      );
       const history = await instance.history(0);
-      expect(history[0] === elem.address, "Wrong element address");
-      expect(history[1] === 2, "Wrong operation type");
+      expect(history[0], "Wrong element address").to.eq(
+        await elem.getAddress()
+      );
+      expect(Number(history[1]), "Wrong operation type").to.eq(2);
     });
 
     it("emits event", async () => {
@@ -713,17 +846,21 @@ describe("Bucket", () => {
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
       const Element = await hre.ethers.getContractFactory("Element");
       const elem = await Element.deploy();
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       const receipt = await instance.notifyUpdateParent(
-        elem.address,
+        await elem.getAddress(),
         ACCOUNT_0_ADDRESS
       );
       expect(receipt)
         .to.emit(instance, "UpdateParent")
         .withArgs(
-          elem.address,
+          await elem.getAddress(),
           receipt.blockNumber,
-          ethers.constants.AddressZero,
+          ethers.ZeroAddress,
           ACCOUNT_0_ADDRESS
         );
     });
@@ -744,14 +881,18 @@ describe("Bucket", () => {
       await (instance as BucketMock).mockRegisterElement(ACCOUNT_0_ADDRESS);
       const Element = await hre.ethers.getContractFactory("Element");
       const elem = await Element.deploy();
-      await instance.addKeys(["key123"], [ACCOUNT_0_ADDRESS]);
+      await instance.addKeys(
+        ["key123"],
+        [ACCOUNT_0_ADDRESS],
+        ACCOUNT_0_PUBLIC_KEY
+      );
       const receipt = await instance.notifyDelete(
-        elem.address,
+        await elem.getAddress(),
         ACCOUNT_0_ADDRESS
       );
       expect(receipt)
         .to.emit(instance, "Delete")
-        .withArgs(elem.address, ACCOUNT_0_ADDRESS);
+        .withArgs(await elem.getAddress(), ACCOUNT_0_ADDRESS);
     });
   });
 
@@ -763,7 +904,7 @@ describe("Bucket", () => {
       await expect(
         instance
           .connect(await hre.ethers.getSigner(ACCOUNT_1_ADDRESS))
-          .setElementImplementation(elem.address)
+          .setElementImplementation(await elem.getAddress())
       ).to.be.revertedWith(new RegExp(/is missing role/));
     });
 
@@ -771,9 +912,11 @@ describe("Bucket", () => {
       const instance = await createNewBucket();
       const Element = await hre.ethers.getContractFactory("Element");
       const elem = await Element.deploy();
-      await instance.setElementImplementation(elem.address);
+      await instance.setElementImplementation(await elem.getAddress());
       const address = await instance.elementImpl();
-      expect(address === elem.address, "Wrong element implementation set.");
+      expect(address, "Wrong element implementation set.").to.eq(
+        await elem.getAddress()
+      );
     });
   });
 
@@ -791,7 +934,7 @@ describe("Bucket", () => {
       const instance = await createNewBucket();
       await instance.setMinElementRedundancy(2);
       const redundancy = await instance.minElementRedundancy();
-      expect(redundancy === 2, "Wrong redundancy level set.");
+      expect(Number(redundancy), "Wrong redundancy level set.").to.eq(2);
     });
   });
 });

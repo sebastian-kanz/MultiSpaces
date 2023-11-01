@@ -2,105 +2,141 @@
 pragma solidity ^0.8.12;
 
 interface IPaymentManager {
-  enum PayableAction {
-    CREATE_SPACE, // Payed by space
-    ADD_BUCKET, // Payed by space
-    ADD_PARTICIPANT // Payed by bucket
-  }
+    enum PayableAction {
+        CREATE_SPACE, // Payed by space
+        ADD_BUCKET, // Payed by space
+        ADD_PARTICIPANT // Payed by bucket
+    }
 
-  enum LimitedAction {
-    ADD_DATA // Payed by bucket
-  }
+    enum LimitedAction {
+        ADD_DATA // Payed by bucket
+    }
 
-  event PayableActionEvent(
-    PayableAction indexed _action,
-    address indexed _sender,
-    uint256 fee,
-    bool voucher,
-    bool unlimited
-  );
+    struct PaymentState {
+        uint256 limit;
+        bool unlimited;
+        uint256 balance;
+        uint256 createSpaceVoucherCount;
+        uint256 addBucketVoucherCount;
+        uint256 addParticipantVoucherCount;
+        bool createSpaceIsFreeOfCharge;
+        bool addBucketIsFreeOfCharge;
+        bool addParticipantIsFreeOfCharge;
+        uint256 defaultLimit;
+        uint256 defaultPayment;
+    }
 
-  event LimitedActionEvent(
-    LimitedAction indexed _action,
-    address indexed _sender,
-    address indexed _owner,
-    uint256 limitLeftOver,
-    bool unlimited
-  );
+    event PayableActionEvent(
+        PayableAction indexed _action,
+        address indexed _sender,
+        uint256 fee,
+        bool voucher,
+        bool unlimited
+    );
 
-  function decreaseLimit(LimitedAction action, uint256 amount) external;
+    event LimitedActionEvent(
+        LimitedAction indexed _action,
+        address indexed _sender,
+        address indexed _owner,
+        uint256 limitLeftOver,
+        bool unlimited
+    );
 
-  function increaseLimit(
-    LimitedAction action,
-    uint256 amount,
-    address bucket
-  ) external payable;
+    event LimitsInitialized(address indexed _account);
 
-  function chargeFee(PayableAction action) external payable;
+    function getPaymentState(
+        address account
+    )
+        external
+        view
+        returns (
+            uint256,
+            bool,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            bool,
+            bool,
+            bool,
+            uint256,
+            uint256
+        );
 
-  function redeemCredit(
-    address receiver,
-    uint256 credit,
-    string memory random,
-    bytes memory signature
-  ) external payable;
+    function decreaseLimit(LimitedAction action, uint256 amount) external;
 
-  function getBalance(address account) external view returns (uint256);
+    function increaseLimit(
+        LimitedAction action,
+        uint256 amount,
+        address bucket
+    ) external payable;
 
-  function getLimit(address account, LimitedAction action)
-    external
-    returns (uint256);
+    function chargeFee(PayableAction action) external payable;
 
-  function getVoucherCount(address account, PayableAction action)
-    external
-    view
-    returns (uint256);
+    function redeemCredit(
+        address receiver,
+        uint256 credit,
+        string memory random,
+        bytes memory signature
+    ) external payable;
 
-  function isFreeOfCharge(address account, PayableAction action)
-    external
-    view
-    returns (bool);
+    function getBalance(address account) external view returns (uint256);
 
-  function isUnlimited(address account, LimitedAction action)
-    external
-    view
-    returns (bool);
+    function getLimit(
+        address account,
+        LimitedAction action
+    ) external view returns (uint256);
 
-  function increaseCredits(address receiver) external payable;
+    function getVoucherCount(
+        address account,
+        PayableAction action
+    ) external view returns (uint256);
 
-  function transferCredits(uint256 amount, address receiver) external payable;
+    function isFreeOfCharge(
+        address account,
+        PayableAction action
+    ) external view returns (bool);
 
-  // ### OWNER FUNCTIONS ###
+    function isUnlimited(
+        address account,
+        LimitedAction action
+    ) external view returns (bool);
 
-  function setAccountFreeOfCharge(
-    address account,
-    PayableAction action,
-    bool enable
-  ) external;
+    function increaseCredits(address receiver) external payable;
 
-  function setAccountUnlimited(
-    address account,
-    LimitedAction action,
-    bool enable
-  ) external;
+    function transferCredits(uint256 amount, address receiver) external payable;
 
-  function addVoucher(
-    address adr,
-    PayableAction action,
-    uint256 amount
-  ) external;
+    // ### OWNER FUNCTIONS ###
 
-  function addLimit(
-    address adr,
-    LimitedAction action,
-    uint256 amount
-  ) external;
+    function setAccountFreeOfCharge(
+        address account,
+        PayableAction action,
+        bool enable
+    ) external;
 
-  function setDefaultFee(uint256 newBaseFee) external;
+    function setAccountUnlimited(
+        address account,
+        LimitedAction action,
+        bool enable
+    ) external;
 
-  function setDefaultLimit(uint256 newBaseLimit) external;
+    function addVoucher(
+        address adr,
+        PayableAction action,
+        uint256 amount
+    ) external;
 
-  function manufacturerWithdraw() external;
+    function addLimit(
+        address adr,
+        LimitedAction action,
+        uint256 amount
+    ) external;
 
-  function setLimitPrice(uint256) external;
+    function setDefaultFee(uint256 newBaseFee) external;
+
+    function setDefaultLimit(uint256 newBaseLimit) external;
+
+    function manufacturerWithdraw() external;
+
+    function setLimitPrice(uint256) external;
 }

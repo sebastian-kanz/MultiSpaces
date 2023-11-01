@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "./interfaces/IParticipantManager.sol";
 import "./interfaces/IPaymentManager.sol";
 import "./libraries/LibParticipant.sol";
 import "./libraries/InvitationChecker.sol";
 import "./libraries/PubKeyChecker.sol";
 import "./adapters/PaymentAdapter.sol";
-
-// import "./Delegation.sol";
+import "./SessionManager.sol";
 
 contract ParticipantManager is
     IParticipantManager,
+    SessionManager,
     AccessControl,
-    PaymentAdapter
-    // Delegation
+    PaymentAdapter,
+    Initializable
 {
     using LibParticipant for *;
     using PubKeyChecker for address;
@@ -27,6 +28,7 @@ contract ParticipantManager is
     mapping(bytes32 => bool) private allInvitationHashes;
 
     event AddParticipant(address indexed _participant);
+    event AddRequestor(address indexed _requestor, address indexed _device);
 
     event RemoveParticipant(address indexed _participant);
 
@@ -37,12 +39,16 @@ contract ParticipantManager is
         LibParticipant.OWNER_ROLE
     ];
 
-    constructor(
+    mapping(address => LibParticipant.Request) public allRequests;
+    address[] public allRequestorAddresses;
+
+    function initialize(
         string memory name,
         address participant,
         bytes memory pubKey,
         address pManager
-    ) {
+    ) external initializer {
+        // Roles for ParticipantManagerFactory
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(LibParticipant.OWNER_ROLE, msg.sender);
         require(
@@ -52,12 +58,14 @@ contract ParticipantManager is
         );
         require(participant != address(0), "Missing address");
 
-        bytes32[] memory roles = new bytes32[](5);
-        roles[0] = DEFAULT_ADMIN_ROLE;
-        roles[1] = LibParticipant.OWNER_ROLE;
-        roles[2] = LibParticipant.MANAGER_ROLE;
-        roles[3] = LibParticipant.UPDATER_ROLE;
-        roles[4] = LibParticipant.PARTICIPANT_ROLE;
+        // Roles for Participant
+        bytes32[] memory roles = new bytes32[](4);
+        // TODO: maybe new participant must again also be admin?
+        // roles[0] = DEFAULT_ADMIN_ROLE;
+        roles[0] = LibParticipant.OWNER_ROLE;
+        roles[1] = LibParticipant.MANAGER_ROLE;
+        roles[2] = LibParticipant.UPDATER_ROLE;
+        roles[3] = LibParticipant.PARTICIPANT_ROLE;
         _addParticipant(participant, name, pubKey);
 
         // Further roles submitted in [roles]
@@ -67,39 +75,32 @@ contract ParticipantManager is
 
         paymentManager = IPaymentManager(pManager);
         _setPaymentManager(pManager);
-        // GENESIS = block.number;
+        GENESIS = block.number;
     }
 
     function participantCount() external view override returns (uint256) {
         return allParticipantAddresses.length;
     }
 
-    function hasRole(bytes32 role, address account)
-        public
-        view
-        override(IParticipantManager, AccessControl)
-        returns (bool)
-    {
-        return AccessControl.hasRole(role, account);
+    function hasRole(
+        bytes32 role,
+        address account
+    ) public view override(IParticipantManager, AccessControl) returns (bool) {
+        bool accountHasRole = AccessControl.hasRole(role, account);
+        bool accountHasSession = _holdsActiveSession(account);
+        if (accountHasSession) {
+            address origin = _getAccountForSessionAccount(account);
+            accountHasRole = AccessControl.hasRole(role, origin);
+        }
+        return accountHasRole;
     }
 
-    // function hasRoleDelegated(
-    //     bytes32 role,
-    //     address delegator,
-    //     address delegate
-    // ) public view returns (bool) {
-    //     require(_isDelegated(delegator, delegate), "Unauthorized!");
-    //     return AccessControl.hasRole(role, delegator);
-    // }
-
-    // function delegatedSender(address delegator, address delegate)
-    //     external
-    //     view
-    //     override
-    //     returns (address)
-    // {
-    //     return _delegatedSender(delegator, delegate);
-    // }
+    function grantRole(
+        bytes32 role,
+        address account
+    ) public override(IParticipantManager, AccessControl) {
+        AccessControl.grantRole(role, account);
+    }
 
     function _addParticipant(
         address adr,
@@ -117,10 +118,9 @@ contract ParticipantManager is
     }
 
     /// @notice Users can remove their participation
-    function removeParticipation(address participant)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeParticipation(
+        address participant
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete (allParticipants[participant]);
 
         int256 foundIndex = -1;
@@ -141,34 +141,143 @@ contract ParticipantManager is
         emit RemoveParticipant(participant);
     }
 
-    /// @notice Users can redeem their participation code from existing member to join the BucktManager
-    /// @param name The name of the new participant
-    /// @param inviter The member (requires MANAGER_ROLE) that send the 'invitation code' to the new participant
-    /// @param signature Acts as invitation code, needs to be verified
-    /// @param randomCode Unique identifier to prevent multi use of single code
-    function redeemParticipationCode(
+    // function redeemParticipationCode(
+    //     string memory name,
+    //     address inviter,
+    //     address invitee,
+    //     bytes memory signature,
+    //     string memory randomCode,
+    //     bytes memory pubKey
+    // ) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
+    //     require(hasRole(LibParticipant.MANAGER_ROLE, inviter), "Forbidden");
+
+    //     (bool isValid, bytes32 hash) = signature.isValidInvitation(
+    //         inviter,
+    //         randomCode
+    //     );
+    //     require(isValid, "Invalid invitation");
+
+    //     require(allParticipants[invitee].initialized == false, "User exists");
+    //     require(allInvitationHashes[hash] == false, "Already used");
+    //     allInvitationHashes[hash] = true;
+
+    //     _addParticipant(invitee, name, pubKey);
+    //     _grantRole(LibParticipant.PARTICIPANT_ROLE, invitee);
+
+    //     emit AddParticipant(invitee);
+    // }
+
+    // TODO: Create function to request participation for a new device only
+    function addParticipation(
+        string memory newParticipantName,
+        address newParticipantAdr,
+        bytes memory newParticipantPubKey
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            allParticipants[newParticipantAdr].initialized == false,
+            "User exists"
+        );
+        _addParticipant(
+            newParticipantAdr,
+            newParticipantName,
+            newParticipantPubKey
+        );
+        _grantRole(LibParticipant.PARTICIPANT_ROLE, newParticipantAdr);
+        emit AddParticipant(newParticipantAdr);
+    }
+
+    function requestParticipation(
         string memory name,
-        address inviter,
-        address invitee,
-        bytes memory signature,
-        string memory randomCode,
-        bytes memory pubKey
-    ) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(hasRole(LibParticipant.MANAGER_ROLE, inviter), "Forbidden");
+        address requestor,
+        bytes memory pubKey,
+        string memory deviceName,
+        address device,
+        bytes memory devicePubKey,
+        bytes memory signature
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(allParticipants[requestor].initialized == false, "User exists");
+        require(allParticipants[device].initialized == false, "Device exists");
 
         (bool isValid, bytes32 hash) = signature.isValidInvitation(
-            inviter,
-            randomCode
+            requestor,
+            name
         );
-        require(isValid, "Invalid invitation");
+        require(isValid, "Invalid request");
+        _addParticipant(requestor, name, pubKey);
+        _addParticipant(device, deviceName, devicePubKey);
 
-        require(allParticipants[invitee].initialized == false, "User exists");
-        require(allInvitationHashes[hash] == false, "Already used");
-        allInvitationHashes[hash] = true;
+        _grantRole(LibParticipant.REQUESTOR_ROLE, requestor);
+        _grantRole(LibParticipant.REQUESTOR_ROLE, device);
+        allRequests[requestor] = LibParticipant.Request(
+            requestor,
+            device,
+            address(0),
+            false
+        );
+        allRequests[device] = LibParticipant.Request(
+            device,
+            device,
+            address(0),
+            false
+        );
+        allRequestorAddresses.push(requestor);
+        allRequestorAddresses.push(device);
+        emit AddRequestor(requestor, device);
+    }
 
-        _addParticipant(invitee, name, pubKey);
-        _grantRole(LibParticipant.PARTICIPANT_ROLE, invitee);
+    function acceptParticipation(
+        address requestor,
+        address acceptor
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            allRequests[requestor].accepted == false,
+            "Request (user) already accepted"
+        );
+        address device = allRequests[requestor].device;
+        require(
+            allRequests[device].accepted == false,
+            "Request (device) already accepted"
+        );
 
-        emit AddParticipant(invitee);
+        _revokeRole(LibParticipant.REQUESTOR_ROLE, requestor);
+        _revokeRole(LibParticipant.REQUESTOR_ROLE, device);
+        _grantRole(LibParticipant.PARTICIPANT_ROLE, requestor);
+        _grantRole(LibParticipant.PARTICIPANT_ROLE, device);
+        allRequests[requestor].accepted = true;
+        allRequests[requestor].acceptor = acceptor;
+        allRequests[device].accepted = true;
+        allRequests[device].acceptor = acceptor;
+        emit AddParticipant(requestor);
+        emit AddParticipant(device);
+    }
+
+    function createSession(
+        address account,
+        address sessionAccount,
+        uint256 validUntilEpoch,
+        bytes memory uniqueSessionCode,
+        bytes memory authSig
+    ) external payable {
+        _createSession(
+            account,
+            sessionAccount,
+            validUntilEpoch,
+            uniqueSessionCode,
+            authSig
+        );
+        (bool sent, bytes memory data) = sessionAccount.call{value: msg.value}(
+            ""
+        );
+        require(sent, "Failed to send Ether");
+    }
+
+    function revokeSession(
+        address account,
+        address sessionAccount,
+        bytes memory authSig
+    ) external payable {
+        _revokeSession(account, sessionAccount, authSig);
+        (bool sent, bytes memory data) = account.call{value: msg.value}("");
+        require(sent, "Failed to send Ether");
     }
 }
