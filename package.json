@@ -8,21 +8,30 @@
     "size": "npx hardhat size-contracts",
     "clean": "npx hardhat clean && rimraf build contracts/build",
     "test": "npx hardhat test",
+    "lint": "npx hardhat check",
     "accounts": "npx hardhat accounts",
+    "gas-report": "npx hardhat gas-reporter",
     "typechain": "npx hardhat typechain",
     "generate:abi": "npx hardhat export-abi",
     "deploy:local": "npx hardhat run scripts/deploy.ts --network hardhat",
+    "deploy:polygon": "npx hardhat run scripts/deploy.ts --network polygon",
     "deploy:mumbai": "npx hardhat run scripts/deploy.ts --network polygon_mumbai",
+    "deploy:zkevm_test": "npx hardhat run scripts/deploy.ts --network polygon_zkevm_test",
+    "deploy:zkevm": "npx hardhat run scripts/deploy.ts --network polygon_zkevm",
     "deploy:goerli": "npx hardhat run scripts/deploy.ts --network goerli"
   },
   "author": "Sebastian Kanz",
   "license": "MIT",
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@nomiclabs/hardhat-solhint": "^3.0.1",
     "@openzeppelin/contracts": "^4.9.3",
     "dotenv": "^16.0.3",
+    "ethers": "^6.8.1",
     "hardhat": "^2.17.3",
     "hardhat-abi-exporter": "^2.10.1",
-    "hardhat-contract-sizer": "^2.10.0"
+    "hardhat-contract-sizer": "^2.10.0",
+    "hardhat-gas-reporter": "^1.0.9",
+    "hardhat-storage-layout": "^0.1.7"
   }
 }

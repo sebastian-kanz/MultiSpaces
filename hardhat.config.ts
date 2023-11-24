@@ -1,7 +1,10 @@
 import { HardhatUserConfig, task } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "hardhat-gas-reporter";
 require("hardhat-abi-exporter");
-require("hardhat-contract-sizer");
+import "hardhat-contract-sizer";
+import "@nomiclabs/hardhat-solhint";
+import "hardhat-storage-layout";
 import "dotenv/config";
 
 require("dotenv").config();
@@ -26,8 +29,29 @@ const config: HardhatUserConfig = {
         mnemonic,
       },
     },
+    polygon: {
+      url: `https://polygon-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID_POLYGON_POS}`,
+      accounts: {
+        mnemonic,
+      },
+      from: "0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D",
+    },
     polygon_mumbai: {
-      url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.alchemyid}`,
+      url: `https://polygon-mumbai.g.alchemy.com/v2/${process.env.ALCHEMY_ID_POLYGON_MUMBAI}`,
+      accounts: {
+        mnemonic,
+      },
+      from: "0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D",
+    },
+    polygon_zkevm_test: {
+      url: `https://polygonzkevm-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID_POLYGON_ZKEVM_TEST}`,
+      accounts: {
+        mnemonic,
+      },
+      from: "0xF4c690b6440e8cb6BD39D010417C1dc25bf4EB9D",
+    },
+    polygon_zkevm: {
+      url: `https://polygonzkevm-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_ID_POLYGON_ZKEVM}`,
       accounts: {
         mnemonic,
       },
@@ -71,6 +95,10 @@ const config: HardhatUserConfig = {
     rename: (sourceName: string, contractName: string) => contractName + ".abi",
     spacing: 2,
     format: "json",
+  },
+  addressExporter: {
+    path: "./addresses",
+    runPrettier: false,
   },
 };
 

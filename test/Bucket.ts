@@ -14,6 +14,8 @@ const {
   ACCOUNT_0_ADDRESS,
   ACCOUNT_1_ADDRESS,
   ACCOUNT_1_PUBLIC_KEY,
+  ACCOUNT_2_ADDRESS,
+  ACCOUNT_2_PUBLIC_KEY,
 } = getAccountKeys();
 
 describe("Bucket", () => {
@@ -573,8 +575,11 @@ describe("Bucket", () => {
         .requestParticipation(
           name,
           ACCOUNT_1_ADDRESS,
-          signResult,
-          ACCOUNT_1_PUBLIC_KEY
+          ACCOUNT_1_PUBLIC_KEY,
+          "deviceName",
+          ACCOUNT_2_ADDRESS,
+          ACCOUNT_2_PUBLIC_KEY,
+          signResult
         );
       const participantManagerAddress = await instance.participantManager();
       const participantManager = await await hre.ethers.getContractAt(
@@ -582,7 +587,7 @@ describe("Bucket", () => {
         participantManagerAddress
       );
       const count = await participantManager.participantCount();
-      expect(Number(count), "Wrong participant count!").to.eq(2);
+      expect(Number(count), "Wrong participant count!").to.eq(3);
     });
   });
 
@@ -601,8 +606,11 @@ describe("Bucket", () => {
       await instance.requestParticipation(
         name,
         ACCOUNT_1_ADDRESS,
-        signResult,
-        ACCOUNT_1_PUBLIC_KEY
+        ACCOUNT_1_PUBLIC_KEY,
+        "deviceName",
+        ACCOUNT_2_ADDRESS,
+        ACCOUNT_2_PUBLIC_KEY,
+        signResult
       );
       await instance.acceptParticipation(ACCOUNT_1_ADDRESS, {
         value: 1000000000000000,
@@ -633,8 +641,11 @@ describe("Bucket", () => {
       await instance.requestParticipation(
         name,
         ACCOUNT_1_ADDRESS,
-        signResult,
-        ACCOUNT_1_PUBLIC_KEY
+        ACCOUNT_1_PUBLIC_KEY,
+        "deviceName",
+        ACCOUNT_2_ADDRESS,
+        ACCOUNT_2_PUBLIC_KEY,
+        signResult
       );
 
       await expect(
@@ -656,8 +667,11 @@ describe("Bucket", () => {
       await instance.requestParticipation(
         name,
         ACCOUNT_1_ADDRESS,
-        signResult,
-        ACCOUNT_1_PUBLIC_KEY
+        ACCOUNT_1_PUBLIC_KEY,
+        "deviceName",
+        ACCOUNT_2_ADDRESS,
+        ACCOUNT_2_PUBLIC_KEY,
+        signResult
       );
 
       await expect(

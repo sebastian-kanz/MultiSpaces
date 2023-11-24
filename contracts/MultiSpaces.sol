@@ -9,12 +9,12 @@ import "@openzeppelin/contracts/proxy/Clones.sol";
 
 contract MultiSpaces is Ownable {
     using Clones for address;
-    address spaceImplementation;
+    address private spaceImplementation;
     address[] public spaces;
     mapping(bytes => address) public ownedSpaces;
-    uint256 public constant baseFee = 1000000000000000;
-    uint256 public constant baseLimit = 100;
-    uint256 public constant limitPrice = 1000000000000;
+    uint256 public constant BASE_FEE = 1000000000000000;
+    uint256 public constant BASE_LIMIT = 100;
+    uint256 public constant LIMIT_PRICE = 1000000000000;
     PaymentManager public paymentManager;
     BucketFactory public bucketFactory;
     ParticipantManagerFactory public participantManagerFactory;
@@ -24,7 +24,7 @@ contract MultiSpaces is Ownable {
         ParticipantManagerFactory pFactory,
         address impl
     ) {
-        paymentManager = new PaymentManager(baseFee, baseLimit, limitPrice);
+        paymentManager = new PaymentManager(BASE_FEE, BASE_LIMIT, LIMIT_PRICE);
         paymentManager.transferOwnership(owner());
         bucketFactory = bfactory;
         participantManagerFactory = pFactory;

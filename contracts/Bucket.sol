@@ -151,11 +151,13 @@ contract Bucket is
     }
 
     /// @notice Get all elements
+    // TODO: When lots of elements, we run into issues. Instead, return in chunks. Use a integer value to store the size.
     function getAll() external view override returns (address[] memory) {
         return allElements;
     }
 
     /// @notice Get the history
+    // TODO: When history gets very big, we run into issues. Instead, return in chunks. Use a integer value to store the size.
     function getHistory()
         external
         view
@@ -164,23 +166,6 @@ contract Bucket is
     {
         return history;
     }
-
-    // function redeemParticipationCode(
-    //     string memory name,
-    //     address inviter,
-    //     bytes memory signature,
-    //     string memory randomCode,
-    //     bytes memory pubKey
-    // ) external payable charge(IPaymentManager.PayableAction.ADD_PARTICIPANT) {
-    //     _redeemParticipationCode(
-    //         name,
-    //         inviter,
-    //         msg.sender,
-    //         signature,
-    //         randomCode,
-    //         pubKey
-    //     );
-    // }
 
     function addParticipation(
         string memory newParticipantName,

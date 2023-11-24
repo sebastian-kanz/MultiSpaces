@@ -7,9 +7,11 @@ import "./KeyManager.sol";
 import "./Element.sol";
 import "./libraries/LibParticipant.sol";
 import "./libraries/LibElement.sol";
+import "./libraries/LibEpoch.sol";
 import "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 
 abstract contract SessionManager {
+    using LibEpoch for uint256;
     struct Session {
         uint256 validUntilEpoch;
         bool active;
@@ -21,19 +23,15 @@ abstract contract SessionManager {
     mapping(address => address) activeSessions; // maps sessionAccount to accounts
     mapping(bytes => bool) usedSessionCodes;
 
-    function _currentEpoch() private view returns (uint256) {
-        return (block.number - GENESIS) / EPOCH;
-    }
-
     function _activeSessionExists(
         address account,
         address sessionAccount
-    ) internal view returns (bool) {
+    ) private view returns (bool) {
         if (
             account == account ||
             (sessions[account][sessionAccount].active &&
                 sessions[account][sessionAccount].validUntilEpoch <=
-                _currentEpoch())
+                LibEpoch.currentEpoch(GENESIS, EPOCH))
         ) {
             return true;
         }
@@ -67,7 +65,10 @@ abstract contract SessionManager {
             !usedSessionCodes[uniqueSessionCode],
             "Session code already used."
         );
-        require(_currentEpoch() <= validUntilEpoch, "Session expired.");
+        require(
+            LibEpoch.currentEpoch(GENESIS, EPOCH) <= validUntilEpoch,
+            "Session expired."
+        );
         bytes32 hash = keccak256(
             abi.encodePacked(
                 account,
@@ -101,7 +102,7 @@ abstract contract SessionManager {
         require(
             sessions[account][sessionAccount].active ||
                 sessions[account][sessionAccount].validUntilEpoch >
-                _currentEpoch(),
+                LibEpoch.currentEpoch(GENESIS, EPOCH),
             "No active session."
         );
         bytes32 hash = keccak256(abi.encodePacked(account, sessionAccount));

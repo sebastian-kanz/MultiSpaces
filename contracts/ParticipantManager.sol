@@ -141,33 +141,6 @@ contract ParticipantManager is
         emit RemoveParticipant(participant);
     }
 
-    // function redeemParticipationCode(
-    //     string memory name,
-    //     address inviter,
-    //     address invitee,
-    //     bytes memory signature,
-    //     string memory randomCode,
-    //     bytes memory pubKey
-    // ) external payable onlyRole(DEFAULT_ADMIN_ROLE) {
-    //     require(hasRole(LibParticipant.MANAGER_ROLE, inviter), "Forbidden");
-
-    //     (bool isValid, bytes32 hash) = signature.isValidInvitation(
-    //         inviter,
-    //         randomCode
-    //     );
-    //     require(isValid, "Invalid invitation");
-
-    //     require(allParticipants[invitee].initialized == false, "User exists");
-    //     require(allInvitationHashes[hash] == false, "Already used");
-    //     allInvitationHashes[hash] = true;
-
-    //     _addParticipant(invitee, name, pubKey);
-    //     _grantRole(LibParticipant.PARTICIPANT_ROLE, invitee);
-
-    //     emit AddParticipant(invitee);
-    // }
-
-    // TODO: Create function to request participation for a new device only
     function addParticipation(
         string memory newParticipantName,
         address newParticipantAdr,
@@ -195,59 +168,59 @@ contract ParticipantManager is
         bytes memory devicePubKey,
         bytes memory signature
     ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(allParticipants[requestor].initialized == false, "User exists");
         require(allParticipants[device].initialized == false, "Device exists");
 
-        (bool isValid, bytes32 hash) = signature.isValidInvitation(
+        (bool isValid, /* bytes32 hash */) = signature.isValidInvitation(
             requestor,
             name
         );
         require(isValid, "Invalid request");
-        _addParticipant(requestor, name, pubKey);
-        _addParticipant(device, deviceName, devicePubKey);
+        if (!allParticipants[requestor].initialized) {
+            _addParticipant(requestor, name, pubKey);
+            _grantRole(LibParticipant.REQUESTOR_ROLE, requestor);
+            allRequests[requestor] = LibParticipant.Request(
+                requestor,
+                device,
+                address(0),
+                false
+            );
+            allRequestorAddresses.push(requestor);
+            emit AddRequestor(requestor, device);
+        }
 
-        _grantRole(LibParticipant.REQUESTOR_ROLE, requestor);
+        _addParticipant(device, deviceName, devicePubKey);
         _grantRole(LibParticipant.REQUESTOR_ROLE, device);
-        allRequests[requestor] = LibParticipant.Request(
-            requestor,
-            device,
-            address(0),
-            false
-        );
+
         allRequests[device] = LibParticipant.Request(
             device,
             device,
             address(0),
             false
         );
-        allRequestorAddresses.push(requestor);
         allRequestorAddresses.push(device);
-        emit AddRequestor(requestor, device);
+        emit AddRequestor(device, device);
     }
 
     function acceptParticipation(
         address requestor,
         address acceptor
     ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(
-            allRequests[requestor].accepted == false,
-            "Request (user) already accepted"
-        );
         address device = allRequests[requestor].device;
         require(
             allRequests[device].accepted == false,
             "Request (device) already accepted"
         );
-
-        _revokeRole(LibParticipant.REQUESTOR_ROLE, requestor);
+        if (!allRequests[requestor].accepted) {
+            _revokeRole(LibParticipant.REQUESTOR_ROLE, requestor);
+            _grantRole(LibParticipant.PARTICIPANT_ROLE, requestor);
+            allRequests[requestor].accepted = true;
+            allRequests[requestor].acceptor = acceptor;
+            emit AddParticipant(requestor);
+        }
         _revokeRole(LibParticipant.REQUESTOR_ROLE, device);
-        _grantRole(LibParticipant.PARTICIPANT_ROLE, requestor);
         _grantRole(LibParticipant.PARTICIPANT_ROLE, device);
-        allRequests[requestor].accepted = true;
-        allRequests[requestor].acceptor = acceptor;
         allRequests[device].accepted = true;
         allRequests[device].acceptor = acceptor;
-        emit AddParticipant(requestor);
         emit AddParticipant(device);
     }
 
@@ -265,7 +238,7 @@ contract ParticipantManager is
             uniqueSessionCode,
             authSig
         );
-        (bool sent, bytes memory data) = sessionAccount.call{value: msg.value}(
+        (bool sent, /* bytes memory data */) = sessionAccount.call{value: msg.value}(
             ""
         );
         require(sent, "Failed to send Ether");
@@ -277,7 +250,7 @@ contract ParticipantManager is
         bytes memory authSig
     ) external payable {
         _revokeSession(account, sessionAccount, authSig);
-        (bool sent, bytes memory data) = account.call{value: msg.value}("");
+        (bool sent, /* bytes memory data */ ) = account.call{value: msg.value}("");
         require(sent, "Failed to send Ether");
     }
 }

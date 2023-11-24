@@ -104,9 +104,9 @@ describe("MultiSpaces", () => {
     it("works as expected", async () => {
       const instance = await createNewMultiSpace();
       await expect(instance.spaces(0)).to.be.reverted;
-      const baseFee = await instance.baseFee();
+      const baseFee = await instance.BASE_FEE();
       expect(Number(baseFee), "Wrong base fee").to.eq(1000000000000000);
-      const baseLimit = await instance.baseLimit();
+      const baseLimit = await instance.BASE_LIMIT();
       expect(Number(baseLimit), "Wrong base limit").to.eq(100);
 
       const paymentManager = await instance.paymentManager();
